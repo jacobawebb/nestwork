@@ -1,0 +1,35 @@
+import { useMemo, useState, type FormEvent } from 'react';
+import { Clock3, DatabaseBackup, Info, LockKeyhole, Save, ShieldCheck } from 'lucide-react';
+import type { Household, Session } from '@/app/types';
+import { Button, Field, InlineNotice, LoadingBlock, Select, TextInput } from '@/components/ui';
+import { useApiResource } from '@/hooks/use-api-resource';
+import { postJson } from '@/lib/api-client';
+
+interface ContextData { session: Session; household: Household }
+interface AboutData { version: string; commit: string; compatibilityDate: string }
+
+function OwnerSettingsForm({ household, onSaved }: { household: Household; onSaved: () => void | Promise<void> }) {
+  const [form, setForm] = useState({ name: household.name, locale: household.locale, timeZone: household.timeZone, currency: household.currency, ...household.settings });
+  const [confirmTimeZoneChange, setConfirmTimeZoneChange] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const zones = useMemo(() => { try { return Intl.supportedValuesOf('timeZone'); } catch { return [household.timeZone]; } }, [household.timeZone]);
+  const save = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setMessage(null);
+    try { await postJson('/parent/settings', { ...form, confirmTimeZoneChange }, 'PUT'); setMessage({ tone: 'success', text: 'Household settings saved.' }); await onSaved(); }
+    catch (caught) { setMessage({ tone: 'error', text: caught instanceof Error ? caught.message : 'Settings could not be saved.' }); }
+    finally { setBusy(false); }
+  };
+  const zoneChanged = form.timeZone !== household.timeZone;
+  return <form className="form-stack" onSubmit={save}><div className="form-grid"><Field label="Household name"><TextInput value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></Field><Field label="Locale"><TextInput value={form.locale} onChange={(event) => setForm({ ...form, locale: event.target.value })} required /></Field><Field label="Currency"><Select value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value })}><option>GBP</option><option>EUR</option><option>USD</option><option>AUD</option><option>CAD</option><option>NZD</option><option>JPY</option></Select></Field><Field label="Time zone"><Select value={form.timeZone} onChange={(event) => { setForm({ ...form, timeZone: event.target.value }); setConfirmTimeZoneChange(false); }}>{zones.map((zone) => <option key={zone}>{zone}</option>)}</Select></Field></div>{zoneChanged ? <label className="toggle-row"><input type="checkbox" checked={confirmTimeZoneChange} onChange={(event) => setConfirmTimeZoneChange(event.target.checked)} /><span><strong>Confirm this time-zone change</strong><small>Historical timestamps stay fixed. The new zone affects future scheduling and display.</small></span></label> : null}<div className="form-grid"><Field label="Default approval"><Select value={form.defaultApprovalMode} onChange={(event) => setForm({ ...form, defaultApprovalMode: event.target.value as typeof form.defaultApprovalMode })}><option value="PARENT_APPROVAL">Parent checks each chore</option><option value="AUTO_APPROVE">Credit when marked done</option></Select></Field><Field label="Child Chore Board limit"><TextInput type="number" min={1} max={20} value={form.childBoardLimit} onChange={(event) => setForm({ ...form, childBoardLimit: Number(event.target.value) })} /></Field></div><label className="toggle-row"><input type="checkbox" checked={form.childReleaseEnabled} onChange={(event) => setForm({ ...form, childReleaseEnabled: event.target.checked })} /><span><strong>Children may release an uncompleted general chore</strong><small>Parent Return to board remains available independently.</small></span></label><label className="toggle-row"><input type="checkbox" checked={form.savingsGoalsEnabled} onChange={(event) => setForm({ ...form, savingsGoalsEnabled: event.target.checked })} /><span><strong>Savings goals enabled</strong><small>Goals show the same available balance without reserving it.</small></span></label>{message ? <InlineNotice tone={message.tone}>{message.text}</InlineNotice> : null}<div className="settings-save"><Button type="submit" disabled={busy || (zoneChanged && !confirmTimeZoneChange)}><Save size={18} />{busy ? 'Saving…' : 'Save settings'}</Button></div></form>;
+}
+
+export default function SettingsPage() {
+  const context = useApiResource<ContextData>('/context');
+  const about = useApiResource<AboutData>('/parent/about');
+  if (context.loading && !context.data) return <LoadingBlock label="Loading settings…" />;
+  if (!context.data) return <InlineNotice tone="error">{context.error ?? 'Settings could not be loaded.'}</InlineNotice>;
+  const { household, session } = context.data;
+  const owner = session.actor.role === 'OWNER';
+  return <div><header className="page-heading"><div><h1>Household settings</h1><p>Shared defaults, privacy boundaries, and deployment information.</p></div></header>{context.error || about.error ? <InlineNotice tone="error">{context.error ?? about.error}</InlineNotice> : null}<div className="settings-layout"><section className="section-panel"><div className="section-heading"><div><h2>Household defaults</h2><p>{owner ? 'Only you, the owner, can change these controls.' : 'Only the household owner can change these controls.'}</p></div><ShieldCheck /></div><div className="section-body">{owner ? <OwnerSettingsForm key={`${household.timeZone}-${household.name}`} household={household} onSaved={context.reload} /> : <div className="readonly-settings"><div><span>Name</span><strong>{household.name}</strong></div><div><span>Locale & currency</span><strong>{household.locale} · {household.currency}</strong></div><div><span>Time zone</span><strong>{household.timeZone}</strong></div><div><span>Default approval</span><strong>{household.settings.defaultApprovalMode === 'PARENT_APPROVAL' ? 'Parent checks' : 'Auto approve'}</strong></div></div>}</div></section><aside className="settings-aside"><section className="section-panel"><div className="section-heading"><h2><LockKeyhole size={20} />Shared-device security</h2></div><div className="section-body settings-notes"><p><Clock3 />Every parent and child session expires exactly 10 seconds after meaningful activity. Refreshes and deep links cannot bypass the server check.</p><p><DatabaseBackup />The app stores sessions, lockouts, audit records, and household data only in D1.</p></div></section><section className="section-panel"><div className="section-heading"><h2><Info size={20} />About</h2></div><div className="section-body readonly-settings"><div><span>Application</span><strong>Family chores {about.data?.version ?? '0.1.0'}</strong></div><div><span>Commit</span><strong>{about.data?.commit ?? 'unknown'}</strong></div><div><span>Compatibility date</span><strong>{about.data?.compatibilityDate ?? '2026-08-28'}</strong></div></div></section></aside></div></div>;
+}

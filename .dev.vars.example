@@ -1,0 +1,6 @@
+# A long random value used exactly once to unlock /setup.
+BOOTSTRAP_SECRET="replace-with-at-least-32-random-characters"
+ENVIRONMENT="development"
+
+# Optional build metadata shown to the OWNER in Settings > About.
+APP_COMMIT="local"
