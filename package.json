@@ -1,5 +1,5 @@
 {
-  "name": "family-chores",
+  "name": "nestwork",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -20,9 +20,9 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
-    "db:migrate:local": "wrangler d1 migrations apply chores-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply chores-db --remote",
-    "db:backup": "wrangler d1 export chores-db --remote --output=backup.sql",
+    "db:migrate:local": "wrangler d1 migrations apply nestwork-production --local",
+    "db:migrate:remote": "wrangler d1 migrations apply nestwork-production --remote",
+    "db:backup": "wrangler d1 export nestwork-production --remote --output=backup.sql",
     "cron:local": "curl http://localhost:8787/__scheduled?cron=0+*+*+*+*",
     "benchmark:remote": "node scripts/benchmark-remote.mjs"
   },
