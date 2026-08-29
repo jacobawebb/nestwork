@@ -84,9 +84,12 @@ export async function completeSetup(
   const sessionHash = await sha256(sessionToken);
   const timestamp = now.toISOString();
   const ownerPasswordHash = await hashCredential(input.owner.password);
-  const childrenWithHashes = await Promise.all(
-    input.children.map(async (child) => ({ ...child, id: crypto.randomUUID(), pinHash: await hashCredential(child.pin) })),
-  );
+  const childrenWithHashes = [];
+  // Keep memory bounded: each scrypt call uses the configured 16 MiB profile,
+  // and setup permits multiple children in a single request.
+  for (const child of input.children) {
+    childrenWithHashes.push({ ...child, id: crypto.randomUUID(), pinHash: await hashCredential(child.pin) });
+  }
   const invitationLinks = input.invitations.map((invitation) => ({ ...invitation, id: crypto.randomUUID(), token: randomToken() }));
 
   const statements: D1PreparedStatement[] = [

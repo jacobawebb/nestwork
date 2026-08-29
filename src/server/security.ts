@@ -1,8 +1,17 @@
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Context } from 'hono';
+import { scrypt } from 'node:crypto';
 import { first, run } from './db/client';
 
-const PASSWORD_ITERATIONS = 600_000;
+// OWASP's 16 MiB scrypt profile. Cloudflare Workers supports node:crypto's
+// native scrypt implementation, while its WebCrypto PBKDF2 implementation
+// rejects the previously used 600,000-iteration request above 100,000.
+const SCRYPT_N = 2 ** 14;
+const SCRYPT_R = 8;
+const SCRYPT_P = 5;
+const SCRYPT_SALT_BYTES = 16;
+const SCRYPT_KEY_BYTES = 32;
+const SCRYPT_MAX_MEMORY_BYTES = 32 * 1024 * 1024;
 const IDLE_MS = 10_000;
 const LOCKOUT_MS = 15 * 60_000;
 
@@ -24,31 +33,48 @@ export async function sha256(value: string): Promise<string> {
   return bytesToBase64(new Uint8Array(digest));
 }
 
-export async function hashCredential(value: string, iterations = PASSWORD_ITERATIONS): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(value), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
-    key,
-    256,
-  );
-  return `pbkdf2-sha256$${iterations}$${bytesToBase64(salt)}$${bytesToBase64(new Uint8Array(bits))}`;
+function deriveScrypt(value: string, salt: Uint8Array): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    scrypt(
+      value,
+      salt,
+      SCRYPT_KEY_BYTES,
+      { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P, maxmem: SCRYPT_MAX_MEMORY_BYTES },
+      (error, derivedKey) => {
+        if (error) reject(error);
+        else resolve(new Uint8Array(derivedKey));
+      },
+    );
+  });
+}
+
+export async function hashCredential(value: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(SCRYPT_SALT_BYTES));
+  const hash = await deriveScrypt(value, salt);
+  return `scrypt$${SCRYPT_N}$${SCRYPT_R}$${SCRYPT_P}$${bytesToBase64(salt)}$${bytesToBase64(hash)}`;
 }
 
 export async function verifyCredential(value: string, encoded: string): Promise<boolean> {
-  const [algorithm, iterationsText, saltText, hashText] = encoded.split('$');
-  if (algorithm !== 'pbkdf2-sha256' || !iterationsText || !saltText || !hashText) return false;
-  const iterations = Number(iterationsText);
-  if (!Number.isSafeInteger(iterations) || iterations < 100_000) return false;
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(value), 'PBKDF2', false, ['deriveBits']);
-  const actual = new Uint8Array(
-    await crypto.subtle.deriveBits(
-      { name: 'PBKDF2', hash: 'SHA-256', salt: base64ToBytes(saltText), iterations },
-      key,
-      256,
-    ),
-  );
-  return constantTimeEqual(actual, base64ToBytes(hashText));
+  const [algorithm, nText, rText, pText, saltText, hashText, extra] = encoded.split('$');
+  if (
+    algorithm !== 'scrypt' ||
+    nText !== String(SCRYPT_N) ||
+    rText !== String(SCRYPT_R) ||
+    pText !== String(SCRYPT_P) ||
+    !saltText ||
+    !hashText ||
+    extra !== undefined
+  ) return false;
+
+  try {
+    const salt = base64ToBytes(saltText);
+    const expected = base64ToBytes(hashText);
+    if (salt.length !== SCRYPT_SALT_BYTES || expected.length !== SCRYPT_KEY_BYTES) return false;
+    const actual = await deriveScrypt(value, salt);
+    return constantTimeEqual(actual, expected);
+  } catch {
+    return false;
+  }
 }
 
 export async function secureSecretEqual(left: string, right: string): Promise<boolean> {
@@ -145,4 +171,13 @@ export async function clearAttempts(db: D1Database, key: string): Promise<void> 
   await run(db, 'DELETE FROM auth_attempts WHERE attempt_key = ?', key);
 }
 
-export const securityConstants = { PASSWORD_ITERATIONS, IDLE_MS, LOCKOUT_MS } as const;
+export const securityConstants = {
+  SCRYPT_N,
+  SCRYPT_R,
+  SCRYPT_P,
+  SCRYPT_SALT_BYTES,
+  SCRYPT_KEY_BYTES,
+  SCRYPT_MAX_MEMORY_BYTES,
+  IDLE_MS,
+  LOCKOUT_MS,
+} as const;

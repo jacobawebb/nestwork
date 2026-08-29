@@ -29,9 +29,9 @@ interface ChildRow {
   pin_hash: string;
 }
 
-// A fixed, non-secret PBKDF2 verifier keeps unknown/deactivated profile paths
+// A fixed, non-secret scrypt verifier keeps unknown/deactivated profile paths
 // on the same slow-hash code path as real accounts without doing two hashes.
-const DUMMY_CREDENTIAL_HASH = 'pbkdf2-sha256$600000$ZmFtaWx5LWNob3Jlcy1kdW1teS1sb2dpbi1zYWx0$grFP2mE0H87uKvrT+4TPWogqEUkrZoBI7bZMPw8+E44=';
+const DUMMY_CREDENTIAL_HASH = 'scrypt$16384$8$5$ZmFtaWx5LWNob3Jlcy1kdW1teS1sb2dpbi1zYWx0$PZLInIa3alIDDSo8psm/hG+JcWAzZeiZFqVNtW4e+TU=';
 
 export async function listProfiles(db: D1Database): Promise<{
   initialized: boolean;

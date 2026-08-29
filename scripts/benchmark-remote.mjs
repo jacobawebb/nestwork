@@ -100,7 +100,7 @@ const lockObservedMs = globalThis.performance.now() - childLoginFinishedAt;
 const report = {
   target: new globalThis.URL(baseUrl).host,
   samples,
-  workFactor: { algorithm: 'PBKDF2-SHA-256', iterations: 600_000 },
+  workFactor: { algorithm: 'scrypt', N: 2 ** 14, r: 8, p: 5, memoryMiB: 16 },
   parentPasswordSignInMs: { samples: parentTimes.map(Math.round), median: Math.round(median(parentTimes)) },
   childPinSignInMs: { samples: childTimes.map(Math.round), median: Math.round(median(childTimes)) },
   scheduledMaintenanceMs: Math.round(maintenance.elapsedMs),
