@@ -23,11 +23,19 @@ The schema is migration-only. There are no seed or demo household records in dev
 ## Prerequisites
 
 - Node.js 22.x (the supported runtime declared in `package.json`)
-- Corepack and pnpm 11.24.0
+- pnpm, npm, Yarn, or Bun
 - A Cloudflare account only for remote D1/deployment work; local development uses Wrangler's local D1 implementation
 - Chromium installed by Playwright when running E2E tests for the first time
 
-Enable the pinned package manager and install exactly the lockfile:
+Do not treat an unsupported newer local Node warning as release evidence. CI and production verification use Node 22.
+
+## Install dependencies
+
+Choose one package manager and use it consistently within a checkout.
+
+### pnpm (recommended)
+
+The committed `pnpm-lock.yaml` and CI use pnpm 11.24.0, so this is the reproducible release path.
 
 ```sh
 corepack enable
@@ -35,7 +43,40 @@ corepack prepare pnpm@11.24.0 --activate
 pnpm install --frozen-lockfile
 ```
 
-Do not treat an unsupported newer local Node warning as release evidence. CI and production verification use Node 22.
+### npm
+
+```sh
+npm install
+```
+
+### Yarn
+
+```sh
+corepack enable
+yarn install
+```
+
+### Bun
+
+```sh
+bun install
+```
+
+Dependencies are exact-pinned in `package.json`, but only the pnpm lockfile is committed. npm, Yarn, and Bun may produce their own local lockfiles and a different transitive dependency graph. Use pnpm with `--frozen-lockfile` for CI, releases, and exact reproduction unless the repository intentionally adopts and commits another manager's lockfile.
+
+### Command equivalents
+
+All package scripts are package-manager-neutral. The rest of this README uses pnpm for brevity; use the corresponding form below when working with another manager.
+
+| Task | pnpm | npm | Yarn | Bun |
+| --- | --- | --- | --- | --- |
+| Run a script | `pnpm <script>` | `npm run <script>` | `yarn <script>` | `bun run <script>` |
+| Run a local binary | `pnpm exec <binary>` | `npx <binary>` | `yarn exec <binary>` | `bunx <binary>` |
+| Apply local migrations | `pnpm db:migrate:local` | `npm run db:migrate:local` | `yarn db:migrate:local` | `bun run db:migrate:local` |
+| Build and run the Worker | `pnpm worker:dev` | `npm run worker:dev` | `yarn worker:dev` | `bun run worker:dev` |
+| Run all local checks | `pnpm check` | `npm run check` | `yarn check` | `bun run check` |
+| Run browser tests | `pnpm test:e2e` | `npm run test:e2e` | `yarn test:e2e` | `bun run test:e2e` |
+| Deploy | `pnpm deploy` | `npm run deploy` | `yarn deploy` | `bun run deploy` |
 
 ## Fresh local setup
 

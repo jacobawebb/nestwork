@@ -18,7 +18,7 @@ export default defineConfig({
     { name: 'desktop', dependencies: ['setup'], testMatch: /core-flow\.spec\.ts/, use: { ...devices['Desktop Chrome'], browserName: 'chromium' } },
   ],
   webServer: {
-    command: 'pnpm e2e:server',
+    command: 'node scripts/e2e-server.mjs',
     url: 'http://127.0.0.1:8790/api/bootstrap/status',
     reuseExistingServer: false,
     timeout: 120_000,
