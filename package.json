@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "worker:dev": "vite build && wrangler dev --test-scheduled",
     "deploy": "tsc --noEmit && eslint . && vitest run && vite build && wrangler deploy",
+    "deploy:cloudflare": "wrangler d1 migrations apply nestwork-production --remote && wrangler deploy",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
