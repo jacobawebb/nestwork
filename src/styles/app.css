@@ -86,6 +86,15 @@
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
+@media (max-width: 479px) {
+  .parent-rail { gap: 0.25rem; }
+  .brand-mark { gap: 0; padding-inline: 0; }
+  .brand-mark strong { display: none; }
+  .parent-nav { gap: 0; overflow-x: visible; }
+  .parent-nav-link { padding-inline: 0.625rem; }
+  .parent-profile { margin-left: 0; padding-left: 0.25rem; }
+}
+
 @layer components {
   .parent-shell { @apply min-h-screen bg-white lg:grid lg:grid-cols-[240px_1fr]; }
   .parent-rail { @apply sticky top-0 z-30 flex h-auto items-center gap-2 border-b border-border bg-white px-3 py-2 lg:h-screen lg:flex-col lg:items-stretch lg:border-b-0 lg:border-r lg:px-4 lg:py-5; }
@@ -110,6 +119,9 @@
   .section-heading { @apply flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-5; }
   .section-heading h2, .section-heading h3 { @apply mb-0; }
   .section-body { @apply p-4 sm:p-5; }
+  .chore-note { @apply mt-3 rounded-control border border-border bg-surface px-3 py-2 text-sm text-ink; }
+  .chore-note-parent { @apply border-coral/20 bg-coral-soft; }
+  .parent-instance-actions { @apply grid justify-items-end gap-2; }
   .child-shell { @apply mx-auto min-h-screen max-w-3xl bg-white pb-24; }
   .child-header { @apply sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border bg-white/95 px-4 py-3 backdrop-blur-sm sm:px-6; }
   .child-header .button { @apply shrink-0; }

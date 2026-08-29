@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import type { ledgerMutationSchema } from '@/lib/contracts';
-import { auditStatement } from '../audit';
+import { guardedAuditStatement } from '../audit';
 import { all, first } from '../db/client';
 import { validateLedgerMutation } from '../domain/policies';
 import { ApiError } from '../errors';
@@ -83,15 +83,32 @@ export async function createLedgerMutation(db: D1Database, actor: ParentActor, i
   const context = await householdContext(db, actor.householdId);
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
-  await db.batch([
+  const results = await db.batch([
     db
       .prepare(
         `INSERT INTO ledger_entries
          (id, household_id, child_id, chore_instance_id, type, amount_minor, currency, reason, created_by_parent_id, created_at)
-         VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`,
+         SELECT ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?
+         WHERE ? >= 0 OR ? = 1 OR
+           COALESCE((SELECT SUM(amount_minor) FROM ledger_entries WHERE household_id = ? AND child_id = ?), 0) + ? >= 0`,
       )
-      .bind(id, actor.householdId, input.childId, input.type, validation.signedAmount, context.currency, input.reason, actor.id, now),
-    auditStatement(db, {
+      .bind(
+        id,
+        actor.householdId,
+        input.childId,
+        input.type,
+        validation.signedAmount,
+        context.currency,
+        input.reason,
+        actor.id,
+        now,
+        validation.signedAmount,
+        Number(input.confirmNegative),
+        actor.householdId,
+        input.childId,
+        validation.signedAmount,
+      ),
+    guardedAuditStatement(db, {
       householdId: actor.householdId,
       actor,
       action: `LEDGER_${input.type}_CREATED`,
@@ -101,7 +118,8 @@ export async function createLedgerMutation(db: D1Database, actor: ParentActor, i
       at: now,
     }),
   ]);
-  return { id, balanceMinor: balance + validation.signedAmount };
+  if (!results[0]?.meta.changes) throw new ApiError(409, 'The available balance changed. Refresh before recording this entry.', 'LEDGER_GUARD');
+  return { id, balanceMinor: await childBalance(db, actor.householdId, input.childId) };
 }
 
 function mapLedger(row: {

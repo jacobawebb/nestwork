@@ -58,6 +58,8 @@ export interface Chore {
   availableAt: string;
   dueAt: string | null;
   expiresAt: string | null;
+  returnReason?: string | null;
+  completionNote?: string | null;
   completedAt?: string | null;
   reviewedAt?: string | null;
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Archive, CalendarClock, ClipboardList, Edit3, Hand, Plus, Trash2 } from 'lucide-react';
+import { Archive, Ban, CalendarClock, ClipboardList, Edit3, Hand, Plus, Trash2 } from 'lucide-react';
 import { useSearchParams } from 'react-router';
-import type { Chore } from '@/app/types';
+import type { Chore, Household } from '@/app/types';
 import { ChoreCard } from '@/components/chore-card';
 import { ReviewControls } from '@/components/review-controls';
 import { Button, EmptyState, Field, InlineNotice, LoadingBlock, Modal, Select, TextArea, TextInput } from '@/components/ui';
@@ -22,7 +22,7 @@ const weekdays = [{ value: 1, label: 'Mon' }, { value: 2, label: 'Tue' }, { valu
 
 function todayLocal() { return new Date().toLocaleDateString('en-CA'); }
 
-function ChoreForm({ children, initial, initialType, onSaved, onCancel }: { children: Person[]; initial?: Template | null; initialType?: 'ASSIGNED' | 'GENERAL'; onSaved: () => void | Promise<void>; onCancel: () => void }) {
+function ChoreForm({ children, initial, initialType, defaultApprovalMode, onSaved, onCancel }: { children: Person[]; initial?: Template | null; initialType?: 'ASSIGNED' | 'GENERAL'; defaultApprovalMode: 'PARENT_APPROVAL' | 'AUTO_APPROVE'; onSaved: () => void | Promise<void>; onCancel: () => void }) {
   const recurrence = initial?.recurrence;
   const [title, setTitle] = useState(initial?.title ?? '');
   const [instructions, setInstructions] = useState(initial?.instructions ?? '');
@@ -30,7 +30,7 @@ function ChoreForm({ children, initial, initialType, onSaved, onCancel }: { chil
   const [assignedChildId, setAssignedChildId] = useState(initial?.assignedChildId ?? children.find((child) => child.active)?.id ?? '');
   const [eligibleChildIds, setEligibleChildIds] = useState<string[]>(initial?.eligibleChildIds ?? []);
   const [amount, setAmount] = useState(initial ? (initial.amountMinor / 100).toFixed(2) : '');
-  const [approvalMode, setApprovalMode] = useState<'PARENT_APPROVAL' | 'AUTO_APPROVE'>(initial?.approvalMode ?? 'PARENT_APPROVAL');
+  const [approvalMode, setApprovalMode] = useState<'PARENT_APPROVAL' | 'AUTO_APPROVE'>(initial?.approvalMode ?? defaultApprovalMode);
   const [kind, setKind] = useState<'ONCE' | 'DAILY' | 'WEEKLY'>(recurrence?.kind ?? 'ONCE');
   const [interval, setInterval] = useState(recurrence?.interval ?? 1);
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>(recurrence?.weekdays ?? [new Date().getDay()]);
@@ -78,14 +78,36 @@ function ChoreForm({ children, initial, initialType, onSaved, onCancel }: { chil
   </form>;
 }
 
+function ParentInstanceActions({ chore, onChanged }: { chore: Chore; onChanged: () => void | Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const cancelable = ['SCHEDULED', 'AVAILABLE', 'CLAIMED', 'RETURNED_TO_CHILD', 'COMPLETED_PENDING_REVIEW'].includes(chore.status);
+  const returnable = chore.assignmentType === 'GENERAL' && ['CLAIMED', 'RETURNED_TO_CHILD'].includes(chore.status);
+  const act = async (path: string) => {
+    setBusy(true); setError(null);
+    try { await postJson(path, {}); await onChanged(); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : 'The chore could not be updated.'); }
+    finally { setBusy(false); }
+  };
+  if (!cancelable && !returnable && chore.status !== 'COMPLETED_PENDING_REVIEW') return null;
+  return <div className="parent-instance-actions">
+    {chore.status === 'COMPLETED_PENDING_REVIEW' ? <ReviewControls choreId={chore.id} onChanged={onChanged} allowReturnToBoard={chore.assignmentType === 'GENERAL'} /> : null}
+    {returnable ? <Button variant="secondary" size="sm" disabled={busy} onClick={() => void act(`/parent/chores/${chore.id}/return-to-board`)}>Return to board</Button> : null}
+    {cancelable ? <Button variant="quiet" size="sm" disabled={busy} onClick={() => void act(`/parent/chores/${chore.id}/cancel`)}><Ban size={16} />Cancel</Button> : null}
+    {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}
+  </div>;
+}
+
 export default function ChoresPage() {
   const [search, setSearch] = useSearchParams();
   const instances = useApiResource<Chore[]>('/parent/chores');
   const templates = useApiResource<Template[]>('/parent/templates');
   const people = useApiResource<PeopleData>('/parent/people');
+  const context = useApiResource<{ household: Household }>('/context');
   const [editing, setEditing] = useState<Template | null>(null);
   const [creating, setCreating] = useState<'ASSIGNED' | 'GENERAL' | null>(null);
   const [status, setStatus] = useState('OPEN');
+  const [childId, setChildId] = useState('ALL');
   const [date, setDate] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -99,8 +121,9 @@ export default function ChoresPage() {
   const visible = useMemo(() => (instances.data ?? []).filter((chore) => {
     const statusMatch = status === 'ALL' || (status === 'OPEN' ? ['SCHEDULED', 'AVAILABLE', 'CLAIMED', 'RETURNED_TO_CHILD', 'COMPLETED_PENDING_REVIEW'].includes(chore.status) : chore.status === status);
     const dateMatch = !date || chore.availableAt.startsWith(date);
-    return statusMatch && dateMatch;
-  }), [date, instances.data, status]);
+    const childMatch = childId === 'ALL' || chore.assignedChildId === childId || chore.claimedByChildId === childId;
+    return statusMatch && dateMatch && childMatch;
+  }), [childId, date, instances.data, status]);
 
   const archive = async (template: Template, active: boolean) => {
     setError(null);
@@ -113,20 +136,20 @@ export default function ChoresPage() {
     catch (caught) { setError(caught instanceof Error ? caught.message : 'Template could not be deleted.'); }
   };
 
-  const loading = (instances.loading && !instances.data) || (templates.loading && !templates.data) || (people.loading && !people.data);
+  const loading = (instances.loading && !instances.data) || (templates.loading && !templates.data) || (people.loading && !people.data) || (context.loading && !context.data);
   if (loading) return <LoadingBlock label="Loading chores…" />;
   const locale = navigator.language;
   return <div>
     <header className="page-heading"><div><h1>Chores</h1><p>Create assigned chores or publish finite choices to the Chore Board. Existing instances keep their original title and value when a template changes.</p></div><div className="page-actions"><Button variant="secondary" onClick={() => setCreating('GENERAL')}><Hand size={18} />General chore</Button><Button onClick={() => setCreating('ASSIGNED')}><Plus size={18} />Assigned chore</Button></div></header>
-    {error || instances.error || templates.error || people.error ? <InlineNotice tone="error">{error ?? instances.error ?? templates.error ?? people.error}</InlineNotice> : null}
-    <section className="section-panel"><div className="section-heading"><h2>Chore instances</h2><div className="filter-row"><Select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="OPEN">Open and waiting</option><option value="ALL">All statuses</option><option value="COMPLETED_PENDING_REVIEW">Needs review</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option><option value="EXPIRED">Expired</option></Select><TextInput aria-label="Filter by date" type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div></div><div className="section-body chore-list">
-      {visible.map((chore) => <ChoreCard key={chore.id} chore={chore} locale={locale} action={chore.status === 'COMPLETED_PENDING_REVIEW' ? <ReviewControls choreId={chore.id} onChanged={instances.reload} allowReturnToBoard={chore.assignmentType === 'GENERAL'} /> : chore.assignmentType === 'GENERAL' && ['CLAIMED', 'RETURNED_TO_CHILD'].includes(chore.status) ? <Button variant="secondary" size="sm" onClick={async () => { await postJson(`/parent/chores/${chore.id}/return-to-board`, {}); await instances.reload(); }}>Return to board</Button> : null} />)}
+    {error || instances.error || templates.error || people.error || context.error ? <InlineNotice tone="error">{error ?? instances.error ?? templates.error ?? people.error ?? context.error}</InlineNotice> : null}
+    <section className="section-panel"><div className="section-heading"><h2>Chore instances</h2><div className="filter-row"><Select aria-label="Filter by child" value={childId} onChange={(event) => setChildId(event.target.value)}><option value="ALL">All children</option>{people.data?.children.map((child) => <option key={child.id} value={child.id}>{child.displayName}</option>)}</Select><Select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="OPEN">Open and waiting</option><option value="ALL">All statuses</option><option value="COMPLETED_PENDING_REVIEW">Needs review</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option><option value="EXPIRED">Expired</option><option value="CANCELLED">Cancelled</option></Select><TextInput aria-label="Filter by date" type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div></div><div className="section-body chore-list">
+      {visible.map((chore) => <ChoreCard key={chore.id} chore={chore} locale={locale} action={<ParentInstanceActions chore={chore} onChanged={instances.reload} />} />)}
       {visible.length === 0 ? <EmptyState icon={<ClipboardList />} title="No chores match">Change the filters or create a new chore.</EmptyState> : null}
     </div></section>
     <section className="section-panel templates-panel"><div className="section-heading"><div><h2>Reusable templates</h2><p>Templates with generated chores are archived instead of deleted.</p></div></div><div className="template-list">
       {(templates.data ?? []).map((template) => <article key={template.id} className="template-row"><div className="template-icon"><CalendarClock /></div><div><h3>{template.title}</h3><p>{template.assignmentType === 'ASSIGNED' ? 'Assigned' : 'Chore Board'} · {template.recurrence.kind.toLowerCase()} · {template.instanceCount} generated</p></div><span className={template.active ? 'template-active' : 'template-archived'}>{template.active ? 'Active' : 'Archived'}</span><div className="template-actions"><Button variant="quiet" size="sm" onClick={() => setEditing(template)}><Edit3 size={16} />Edit</Button><Button variant="quiet" size="sm" onClick={() => void archive(template, !template.active)}><Archive size={16} />{template.active ? 'Archive' : 'Reactivate'}</Button>{template.instanceCount === 0 ? <Button variant="danger" size="sm" onClick={() => void remove(template)}><Trash2 size={16} />Delete</Button> : null}</div></article>)}
       {templates.data?.length === 0 ? <div className="section-body"><EmptyState icon={<CalendarClock />} title="No templates yet">Creating a chore also creates its reusable template.</EmptyState></div> : null}
     </div></section>
-    {creating || editing ? <Modal title={editing ? 'Edit chore template' : creating === 'GENERAL' ? 'Add to Chore Board' : 'Add assigned chore'} onClose={closeForm}><ChoreForm key={editing?.id ?? creating ?? 'new'} children={people.data?.children ?? []} initial={editing} initialType={creating ?? undefined} onCancel={closeForm} onSaved={reloadAll} /></Modal> : null}
+    {creating || editing ? <Modal title={editing ? 'Edit chore template' : creating === 'GENERAL' ? 'Add to Chore Board' : 'Add assigned chore'} onClose={closeForm}><ChoreForm key={editing?.id ?? creating ?? 'new'} children={people.data?.children ?? []} initial={editing} initialType={creating ?? undefined} defaultApprovalMode={context.data?.household.settings.defaultApprovalMode ?? 'PARENT_APPROVAL'} onCancel={closeForm} onSaved={reloadAll} /></Modal> : null}
   </div>;
 }

@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import type { choreTemplateInputSchema } from '@/lib/contracts';
-import { auditStatement } from '../audit';
+import { auditStatement, guardedAuditStatement } from '../audit';
 import { all, first, run } from '../db/client';
 import { materializeHorizon } from '../domain/recurrence';
 import { ApiError } from '../errors';
@@ -39,6 +39,8 @@ interface InstanceRow {
   available_at: string;
   due_at: string | null;
   expires_at: string | null;
+  return_reason: string | null;
+  completion_note: string | null;
 }
 
 function instanceInsertStatement(db: D1Database, template: TemplateRow, occurrence: ReturnType<typeof materializeHorizon>[number], now: string) {
@@ -247,7 +249,7 @@ export async function archiveTemplate(db: D1Database, actor: ParentActor, templa
   const now = new Date().toISOString();
   const results = await db.batch([
     db.prepare('UPDATE chore_templates SET active = ?, updated_at = ? WHERE id = ? AND household_id = ?').bind(Number(active), now, templateId, actor.householdId),
-    auditStatement(db, {
+    guardedAuditStatement(db, {
       householdId: actor.householdId,
       actor,
       action: active ? 'CHORE_TEMPLATE_REACTIVATED' : 'CHORE_TEMPLATE_ARCHIVED',
@@ -265,7 +267,7 @@ export async function deleteUnusedTemplate(db: D1Database, actor: ParentActor, t
   if (count?.count) throw new ApiError(409, 'Archive templates that have generated chores.', 'ARCHIVE_REQUIRED');
   const results = await db.batch([
     db.prepare('DELETE FROM chore_templates WHERE id = ? AND household_id = ?').bind(templateId, actor.householdId),
-    auditStatement(db, {
+    guardedAuditStatement(db, {
       householdId: actor.householdId,
       actor,
       action: 'CHORE_TEMPLATE_DELETED',
@@ -292,7 +294,7 @@ export async function claimChore(db: D1Database, actor: ChildActor, instanceId: 
            )`,
       )
       .bind(actor.id, instanceId, actor.householdId, now, now, actor.id),
-    auditStatement(db, {
+    guardedAuditStatement(db, {
       householdId: actor.householdId,
       actor,
       action: 'CHORE_CLAIMED',
@@ -315,7 +317,7 @@ export async function releaseClaim(db: D1Database, actor: ChildActor, instanceId
            AND EXISTS (SELECT 1 FROM household_settings s WHERE s.household_id = chore_instances.household_id AND s.child_release_enabled = 1)`,
       )
       .bind(instanceId, actor.householdId, actor.id),
-    auditStatement(db, {
+    guardedAuditStatement(db, {
       householdId: actor.householdId,
       actor,
       action: 'CHORE_RELEASED_BY_CHILD',
@@ -355,6 +357,17 @@ export async function completeChore(db: D1Database, actor: ChildActor, instanceI
       )
       .bind(nextStatus, note, now, auto ? now : null, instanceId, actor.householdId),
   ];
+  statements.push(
+    guardedAuditStatement(db, {
+      householdId: actor.householdId,
+      actor,
+      action: auto ? 'CHORE_AUTO_APPROVED' : 'CHORE_COMPLETED',
+      entityType: 'CHORE_INSTANCE',
+      entityId: instanceId,
+      metadata: { noteProvided: Boolean(note) },
+      at: now,
+    }),
+  );
   if (auto) {
     statements.push(
       db
@@ -366,17 +379,6 @@ export async function completeChore(db: D1Database, actor: ChildActor, instanceI
         .bind(crypto.randomUUID(), actor.householdId, childId, instanceId, instance.amount_minor_snapshot, instance.currency_snapshot, now),
     );
   }
-  statements.push(
-    auditStatement(db, {
-      householdId: actor.householdId,
-      actor,
-      action: auto ? 'CHORE_AUTO_APPROVED' : 'CHORE_COMPLETED',
-      entityType: 'CHORE_INSTANCE',
-      entityId: instanceId,
-      metadata: { noteProvided: Boolean(note) },
-      at: now,
-    }),
-  );
   const results = await db.batch(statements);
   if (!results[0]?.meta.changes) throw new ApiError(409, 'This chore was already updated.', 'CHORE_CONFLICT');
   return { id: instanceId, status: nextStatus, earnedMinor: auto ? instance.amount_minor_snapshot : null };
@@ -408,6 +410,17 @@ export async function reviewChore(
       )
       .bind(status, now, actor.id, action === 'APPROVE' ? null : reason!.trim(), instanceId, actor.householdId),
   ];
+  statements.push(
+    guardedAuditStatement(db, {
+      householdId: actor.householdId,
+      actor,
+      action: `CHORE_${action === 'RETURN' ? 'RETURNED' : action + 'D'}`,
+      entityType: 'CHORE_INSTANCE',
+      entityId: instanceId,
+      metadata: action === 'APPROVE' ? { amountMinor: instance.amount_minor_snapshot } : { reason },
+      at: now,
+    }),
+  );
   if (action === 'APPROVE') {
     statements.push(
       db
@@ -428,17 +441,6 @@ export async function reviewChore(
         ),
     );
   }
-  statements.push(
-    auditStatement(db, {
-      householdId: actor.householdId,
-      actor,
-      action: `CHORE_${action === 'RETURN' ? 'RETURNED' : action + 'D'}`,
-      entityType: 'CHORE_INSTANCE',
-      entityId: instanceId,
-      metadata: action === 'APPROVE' ? { amountMinor: instance.amount_minor_snapshot } : { reason },
-      at: now,
-    }),
-  );
   const results = await db.batch(statements);
   if (!results[0]?.meta.changes) {
     if (action === 'APPROVE') {
@@ -461,7 +463,7 @@ export async function returnToBoard(db: D1Database, actor: ParentActor, instance
            AND claimed_by_child_id IS NOT NULL AND status IN ('CLAIMED','RETURNED_TO_CHILD','COMPLETED_PENDING_REVIEW')`,
       )
       .bind(instanceId, actor.householdId),
-    auditStatement(db, {
+    guardedAuditStatement(db, {
       householdId: actor.householdId,
       actor,
       action: 'CHORE_RETURNED_TO_BOARD',
@@ -472,6 +474,29 @@ export async function returnToBoard(db: D1Database, actor: ParentActor, instance
   ]);
   if (!results[0]?.meta.changes) throw new ApiError(409, 'This chore cannot be returned to the board.', 'INVALID_CHORE_STATE');
   return { id: instanceId, status: 'AVAILABLE' as const };
+}
+
+export async function cancelChore(db: D1Database, actor: ParentActor, instanceId: string) {
+  const now = new Date().toISOString();
+  const results = await db.batch([
+    db
+      .prepare(
+        `UPDATE chore_instances SET status = 'CANCELLED', reviewed_at = ?, reviewer_id = ?
+         WHERE id = ? AND household_id = ?
+           AND status IN ('SCHEDULED','AVAILABLE','CLAIMED','RETURNED_TO_CHILD','COMPLETED_PENDING_REVIEW')`,
+      )
+      .bind(now, actor.id, instanceId, actor.householdId),
+    guardedAuditStatement(db, {
+      householdId: actor.householdId,
+      actor,
+      action: 'CHORE_CANCELLED',
+      entityType: 'CHORE_INSTANCE',
+      entityId: instanceId,
+      at: now,
+    }),
+  ]);
+  if (!results[0]?.meta.changes) throw new ApiError(409, 'This chore cannot be cancelled.', 'INVALID_CHORE_STATE');
+  return { id: instanceId, status: 'CANCELLED' as const };
 }
 
 export async function runScheduledMaintenance(db: D1Database, now = new Date()) {
@@ -558,5 +583,7 @@ function mapInstance(row: InstanceRow & { child_name?: string | null }) {
     availableAt: row.available_at,
     dueAt: row.due_at,
     expiresAt: row.expires_at,
+    returnReason: row.return_reason,
+    completionNote: row.completion_note,
   };
 }

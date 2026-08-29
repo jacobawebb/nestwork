@@ -222,6 +222,12 @@ export async function updateSettings(
   if (current.timeZone !== input.timeZone && !input.confirmTimeZoneChange) {
     throw new ApiError(409, 'Confirm the time-zone change. Historical timestamps will not move.', 'TIME_ZONE_CONFIRMATION');
   }
+  if (current.currency !== input.currency) {
+    const ledger = await first<{ count: number }>(db, 'SELECT COUNT(*) AS count FROM ledger_entries WHERE household_id = ?', actor.householdId);
+    if (ledger?.count) {
+      throw new ApiError(409, 'Currency cannot change after ledger history exists. Existing money records keep their original currency.', 'CURRENCY_CHANGE_BLOCKED');
+    }
+  }
   const now = new Date().toISOString();
   await db.batch([
     db

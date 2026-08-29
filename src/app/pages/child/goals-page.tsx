@@ -13,6 +13,7 @@ export default function ChildGoalsPage() {
   if ((goals.loading && !goals.data) || (context.loading && !context.data)) return <LoadingBlock label="Loading goals…" />;
   if (!goals.data || !context.data) return <InlineNotice tone="error">{goals.error ?? context.error ?? 'Goals could not be loaded.'}</InlineNotice>;
   const { household } = context.data;
+  if (!household.settings.savingsGoalsEnabled) return <InlineNotice tone="info">Savings goals are currently turned off for this household.</InlineNotice>;
   const active = goals.data.filter((goal) => goal.active);
   const spotlight = active.find((goal) => goal.spotlight);
   const choose = async (goalId: string) => { try { await postJson('/child/goals/spotlight', { goalId }, 'PUT'); await goals.reload(); } catch { /* Session boundary handles auth; keep the current selection on a transient failure. */ } };

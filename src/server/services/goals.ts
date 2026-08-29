@@ -4,6 +4,7 @@ import { auditStatement } from '../audit';
 import { all, first } from '../db/client';
 import { ApiError } from '../errors';
 import type { ChildActor, ParentActor } from '../types';
+import { householdContext } from './household';
 import { childBalance } from './ledger';
 
 type GoalInput = z.infer<typeof goalInputSchema>;
@@ -50,6 +51,9 @@ export async function goalsForChild(db: D1Database, householdId: string, childId
 }
 
 export async function createGoal(db: D1Database, actor: ParentActor, input: GoalInput) {
+  if (!(await householdContext(db, actor.householdId)).settings.savingsGoalsEnabled) {
+    throw new ApiError(409, 'Savings goals are disabled in household settings.', 'GOALS_DISABLED');
+  }
   const child = await first<{ id: string }>(
     db,
     'SELECT id FROM children WHERE id = ? AND household_id = ?',
@@ -139,6 +143,9 @@ export async function updateGoal(db: D1Database, actor: ParentActor, goalId: str
 }
 
 export async function selectSpotlightGoal(db: D1Database, actor: ChildActor, goalId: string | null) {
+  if (!(await householdContext(db, actor.householdId)).settings.savingsGoalsEnabled) {
+    throw new ApiError(409, 'Savings goals are disabled in household settings.', 'GOALS_DISABLED');
+  }
   if (goalId) {
     const goal = await first<{ id: string }>(
       db,
@@ -170,5 +177,32 @@ export async function parentGoals(db: D1Database, actor: ParentActor, childId: s
 }
 
 export async function childGoals(db: D1Database, actor: ChildActor) {
+  if (!(await householdContext(db, actor.householdId)).settings.savingsGoalsEnabled) return [];
   return goalsForChild(db, actor.householdId, actor.id);
+}
+
+export async function reorderGoals(db: D1Database, actor: ParentActor, childId: string, goalIds: string[]) {
+  const child = await first<{ id: string }>(db, 'SELECT id FROM children WHERE id = ? AND household_id = ?', childId, actor.householdId);
+  if (!child) throw new ApiError(404, 'Child not found.', 'NOT_FOUND');
+  const active = await all<{ id: string }>(db, 'SELECT id FROM savings_goals WHERE child_id = ? AND active = 1', childId);
+  const expected = new Set(active.map((goal) => goal.id));
+  const received = new Set(goalIds);
+  if (received.size !== goalIds.length || received.size !== expected.size || [...received].some((id) => !expected.has(id))) {
+    throw new ApiError(409, 'Refresh the active goals before reordering them.', 'GOAL_ORDER_CONFLICT');
+  }
+  const now = new Date().toISOString();
+  const statements = goalIds.map((goalId, index) => db
+    .prepare('UPDATE savings_goals SET display_order = ?, updated_at = ? WHERE id = ? AND child_id = ? AND active = 1')
+    .bind(index * 10, now, goalId, childId));
+  statements.push(auditStatement(db, {
+    householdId: actor.householdId,
+    actor,
+    action: 'SAVINGS_GOALS_REORDERED',
+    entityType: 'CHILD',
+    entityId: childId,
+    metadata: { goalIds },
+    at: now,
+  }));
+  await db.batch(statements);
+  return { childId, goalIds };
 }

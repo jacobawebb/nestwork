@@ -10,6 +10,9 @@ describe('owner roles and child goal ownership', () => {
     expect((await request(`/parent/adults/${fixture.parentId}/active`, { cookie: fixture.parentCookie, body: { active: false } })).status).toBe(403);
     expect((await request('/parent/settings', { cookie: fixture.ownerCookie, method: 'PUT', body: settings })).status).toBe(200);
     expect((await request('/parent/invitations', { cookie: fixture.ownerCookie, body: { email: 'new-parent@example.test' } })).status).toBe(201);
+    expect((await request('/parent/maintenance/run', { cookie: fixture.parentCookie, body: {} })).status).toBe(403);
+    expect((await request('/parent/maintenance/run', { cookie: fixture.ownerCookie, body: {} })).status).toBe(200);
+    await expect(bindings().DB.prepare('UPDATE parent_users SET active = 0 WHERE id = ?').bind(fixture.ownerId).run()).rejects.toThrow(/active owner/i);
   });
 
   it('shows multiple goals against the same balance and only allows an owned active spotlight', async () => {
@@ -33,5 +36,11 @@ describe('owner roles and child goal ownership', () => {
     expect((await request('/child/goals/spotlight', { cookie: fixture.childACookie, method: 'PUT', body: { goalId: goalB } })).status).toBe(200);
     expect((await request('/child/goals/spotlight', { cookie: fixture.childACookie, method: 'PUT', body: { goalId: otherGoal } })).status).toBe(404);
     expect((await request(`/parent/goals/${goalA}`, { cookie: fixture.childACookie, method: 'PATCH', body: { targetMinor: 1 } })).status).toBe(403);
+    expect((await request('/parent/goals/reorder', { cookie: fixture.parentCookie, body: { childId: fixture.childAId, goalIds: [goalB, goalA] } })).status).toBe(200);
+    const reordered = await request('/child/goals', { cookie: fixture.childACookie });
+    expect((await reordered.json<any[]>()).map((goal) => goal.name)).toEqual(['Large goal', 'Small goal']);
+    await DB.prepare('UPDATE household_settings SET savings_goals_enabled = 0 WHERE household_id = ?').bind(fixture.householdId).run();
+    expect(await (await request('/child/goals', { cookie: fixture.childACookie })).json<any[]>()).toEqual([]);
+    expect((await request('/parent/goals', { cookie: fixture.parentCookie, body: { childId: fixture.childAId, name: 'Disabled goal', targetMinor: 100, iconKey: 'target', encouragement: null, displayOrder: 0 } })).status).toBe(409);
   });
 });

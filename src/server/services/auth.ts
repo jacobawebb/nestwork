@@ -5,7 +5,6 @@ import {
   assertNotLocked,
   attemptKey,
   clearAttempts,
-  hashCredential,
   idleExpiry,
   randomToken,
   recordFailedAttempt,
@@ -29,6 +28,10 @@ interface ChildRow {
   display_name: string;
   pin_hash: string;
 }
+
+// A fixed, non-secret PBKDF2 verifier keeps unknown/deactivated profile paths
+// on the same slow-hash code path as real accounts without doing two hashes.
+const DUMMY_CREDENTIAL_HASH = 'pbkdf2-sha256$600000$ZmFtaWx5LWNob3Jlcy1kdW1teS1sb2dpbi1zYWx0$grFP2mE0H87uKvrT+4TPWogqEUkrZoBI7bZMPw8+E44=';
 
 export async function listProfiles(db: D1Database): Promise<{
   initialized: boolean;
@@ -89,9 +92,9 @@ export async function loginParent(
      FROM parent_users WHERE id = ? AND active = 1`,
     input.profileId,
   );
-  const valid = parent
-    ? parent.email.toLowerCase() === input.email.trim().toLowerCase() && (await verifyCredential(input.password, parent.password_hash))
-    : await verifyCredential(input.password, await hashCredential('timing-only-credential'));
+  const passwordValid = await verifyCredential(input.password, parent?.password_hash ?? DUMMY_CREDENTIAL_HASH);
+  const emailValid = parent?.email.toLowerCase() === input.email.trim().toLowerCase();
+  const valid = Boolean(parent && emailValid && passwordValid);
   if (!parent || !valid) {
     await recordFailedAttempt(db, key);
     throw new ApiError(401, 'The sign-in details were not accepted.', 'INVALID_CREDENTIALS');
@@ -146,9 +149,7 @@ export async function loginChild(
     'SELECT id, household_id, display_name, pin_hash FROM children WHERE id = ? AND active = 1',
     input.profileId,
   );
-  const valid = child
-    ? await verifyCredential(input.pin, child.pin_hash)
-    : await verifyCredential(input.pin, await hashCredential('000000'));
+  const valid = await verifyCredential(input.pin, child?.pin_hash ?? DUMMY_CREDENTIAL_HASH);
   if (!child || !valid) {
     await recordFailedAttempt(db, key);
     throw new ApiError(401, 'The PIN was not accepted.', 'INVALID_CREDENTIALS');

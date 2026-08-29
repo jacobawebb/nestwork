@@ -50,6 +50,27 @@ describe('household and child authorization with ledger guards', () => {
     expect(balance?.balance).toBe(200);
   });
 
+  it('keeps simultaneous payouts inside the available balance atomically', async () => {
+    const fixture = await createFixture('concurrent-payout');
+    const { DB } = bindings();
+    await DB.prepare(`INSERT INTO ledger_entries (id, household_id, child_id, chore_instance_id, type, amount_minor, currency, reason, created_by_parent_id, created_at) VALUES (?, ?, ?, NULL, 'ADJUSTMENT', 500, 'GBP', 'opening correction', ?, ?)`).bind(crypto.randomUUID(), fixture.householdId, fixture.childAId, fixture.ownerId, new Date().toISOString()).run();
+    const [first, second] = await Promise.all([
+      request('/parent/ledger', { cookie: fixture.ownerCookie, body: { childId: fixture.childAId, type: 'PAYOUT', amountMinor: 400, reason: 'Cash one', confirmNegative: false } }),
+      request('/parent/ledger', { cookie: fixture.ownerCookie, body: { childId: fixture.childAId, type: 'PAYOUT', amountMinor: 400, reason: 'Cash two', confirmNegative: false } }),
+    ]);
+    expect([first.status, second.status].sort()).toEqual([201, 409]);
+    const result = await DB.prepare(`SELECT SUM(amount_minor) AS balance, SUM(CASE WHEN type = 'PAYOUT' THEN 1 ELSE 0 END) AS payouts FROM ledger_entries WHERE child_id = ?`).bind(fixture.childAId).first<{ balance: number; payouts: number }>();
+    expect(result).toEqual({ balance: 100, payouts: 1 });
+  });
+
+  it('prevents a household currency change after immutable ledger history exists', async () => {
+    const fixture = await createFixture('currency-history');
+    await bindings().DB.prepare(`INSERT INTO ledger_entries (id, household_id, child_id, chore_instance_id, type, amount_minor, currency, reason, created_by_parent_id, created_at) VALUES (?, ?, ?, NULL, 'ADJUSTMENT', 100, 'GBP', 'opening correction', ?, ?)`).bind(crypto.randomUUID(), fixture.householdId, fixture.childAId, fixture.ownerId, new Date().toISOString()).run();
+    const response = await request('/parent/settings', { cookie: fixture.ownerCookie, method: 'PUT', body: { name: 'Currency fixture', locale: 'en-US', timeZone: 'Europe/London', currency: 'USD', defaultApprovalMode: 'PARENT_APPROVAL', childReleaseEnabled: true, childBoardLimit: 5, savingsGoalsEnabled: true } });
+    expect(response.status).toBe(409);
+    expect(await response.json<any>()).toMatchObject({ error: { code: 'CURRENCY_CHANGE_BLOCKED' } });
+  });
+
   it('rejects an expired session from a direct protected URL', async () => {
     const fixture = await createFixture('expired-session');
     const { DB } = bindings();

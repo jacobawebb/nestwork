@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const appInstallation = sqliteTable('app_installation', {
   id: integer('id').primaryKey(),
@@ -58,6 +58,67 @@ export const children = sqliteTable(
   (table) => [index('children_household_active').on(table.householdId, table.active)],
 );
 
+export const parentSessions = sqliteTable(
+  'parent_sessions',
+  {
+    tokenHash: text('token_hash').primaryKey(),
+    parentUserId: text('parent_user_id').notNull(),
+    lastActivityAt: text('last_activity_at').notNull(),
+    idleExpiresAt: text('idle_expires_at').notNull(),
+    revokedAt: text('revoked_at'),
+    metadata: text('metadata').notNull(),
+  },
+  (table) => [index('parent_sessions_user_expiry').on(table.parentUserId, table.idleExpiresAt, table.revokedAt)],
+);
+
+export const childSessions = sqliteTable(
+  'child_sessions',
+  {
+    tokenHash: text('token_hash').primaryKey(),
+    childId: text('child_id').notNull(),
+    lastActivityAt: text('last_activity_at').notNull(),
+    idleExpiresAt: text('idle_expires_at').notNull(),
+    revokedAt: text('revoked_at'),
+  },
+  (table) => [index('child_sessions_child_expiry').on(table.childId, table.idleExpiresAt, table.revokedAt)],
+);
+
+export const setupSessions = sqliteTable('setup_sessions', {
+  tokenHash: text('token_hash').primaryKey(),
+  ipHash: text('ip_hash').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  usedAt: text('used_at'),
+  createdAt: text('created_at').notNull(),
+});
+
+export const authAttempts = sqliteTable(
+  'auth_attempts',
+  {
+    attemptKey: text('attempt_key').primaryKey(),
+    failures: integer('failures').notNull(),
+    windowStartedAt: text('window_started_at').notNull(),
+    lockedUntil: text('locked_until'),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('auth_attempts_lockout').on(table.lockedUntil)],
+);
+
+export const parentInvitations = sqliteTable(
+  'parent_invitations',
+  {
+    id: text('id').primaryKey(),
+    householdId: text('household_id').notNull(),
+    email: text('email').notNull(),
+    role: text('role').$type<'PARENT'>().notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: text('expires_at').notNull(),
+    acceptedAt: text('accepted_at'),
+    invitedBy: text('invited_by').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [index('invitations_household_state').on(table.householdId, table.acceptedAt, table.expiresAt)],
+);
+
 export const choreTemplates = sqliteTable(
   'chore_templates',
   {
@@ -111,6 +172,16 @@ export const choreInstances = sqliteTable(
   ],
 );
 
+export const choreTemplateEligibility = sqliteTable(
+  'chore_template_eligibility',
+  {
+    templateId: text('template_id').notNull(),
+    childId: text('child_id').notNull(),
+    householdId: text('household_id').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.templateId, table.childId] })],
+);
+
 export const ledgerEntries = sqliteTable(
   'ledger_entries',
   {
@@ -144,6 +215,12 @@ export const savingsGoals = sqliteTable(
   },
   (table) => [index('goals_child_active_order').on(table.childId, table.active, table.displayOrder)],
 );
+
+export const childGoalPreferences = sqliteTable('child_goal_preferences', {
+  childId: text('child_id').primaryKey(),
+  spotlightGoalId: text('spotlight_goal_id'),
+  updatedAt: text('updated_at').notNull(),
+});
 
 export const auditEvents = sqliteTable(
   'audit_events',

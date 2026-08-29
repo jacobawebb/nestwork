@@ -15,6 +15,7 @@ import {
   setupSchema,
 } from '@/lib/contracts';
 import { ApiError } from './errors';
+import { auditStatement } from './audit';
 import {
   clearSessionCookies,
   clientIp,
@@ -45,6 +46,7 @@ import {
 } from './services/household';
 import {
   archiveTemplate,
+  cancelChore,
   claimChore,
   completeChore,
   createTemplate,
@@ -54,10 +56,11 @@ import {
   listTemplates,
   releaseClaim,
   returnToBoard,
+  runScheduledMaintenance,
   updateTemplate,
 } from './services/chores';
 import { createLedgerMutation, ledgerForChild, ledgerForParent } from './services/ledger';
-import { childGoals, createGoal, parentGoals, selectSpotlightGoal, updateGoal } from './services/goals';
+import { childGoals, createGoal, parentGoals, reorderGoals, selectSpotlightGoal, updateGoal } from './services/goals';
 import { childHome, parentDashboard } from './services/dashboard';
 
 type AppEnv = { Bindings: Env; Variables: ApiVariables };
@@ -233,6 +236,7 @@ protectedApi.post('/parent/chores/:id/review', async (c) => {
   return c.json(await (await import('./services/chores')).reviewChore(c.env.DB, parentFrom(c), c.req.param('id'), input.action, input.reason));
 });
 protectedApi.post('/parent/chores/:id/return-to-board', async (c) => c.json(await returnToBoard(c.env.DB, parentFrom(c), c.req.param('id'))));
+protectedApi.post('/parent/chores/:id/cancel', async (c) => c.json(await cancelChore(c.env.DB, parentFrom(c), c.req.param('id'))));
 
 protectedApi.post('/parent/children', async (c) => {
   const schema = childInputSchema.extend({ pin: childPin });
@@ -273,6 +277,10 @@ protectedApi.get('/parent/ledger', async (c) => c.json(await ledgerForParent(c.e
 protectedApi.post('/parent/ledger', async (c) => c.json(await createLedgerMutation(c.env.DB, parentFrom(c), await json(c, ledgerMutationSchema)), 201));
 protectedApi.get('/parent/goals/:childId', async (c) => c.json(await parentGoals(c.env.DB, parentFrom(c), c.req.param('childId'))));
 protectedApi.post('/parent/goals', async (c) => c.json(await createGoal(c.env.DB, parentFrom(c), await json(c, goalInputSchema)), 201));
+protectedApi.post('/parent/goals/reorder', async (c) => {
+  const input = await json(c, z.object({ childId: z.string().uuid(), goalIds: z.array(z.string().uuid()).min(1).max(50) }));
+  return c.json(await reorderGoals(c.env.DB, parentFrom(c), input.childId, input.goalIds));
+});
 protectedApi.patch('/parent/goals/:id', async (c) => {
   const schema = goalInputSchema.partial().extend({ active: z.boolean().optional() });
   return c.json(await updateGoal(c.env.DB, parentFrom(c), c.req.param('id'), await json(c, schema)));
@@ -280,6 +288,20 @@ protectedApi.patch('/parent/goals/:id', async (c) => {
 protectedApi.get('/parent/about', (c) => {
   parentFrom(c);
   return c.json({ version: c.env.APP_VERSION, commit: c.env.APP_COMMIT, compatibilityDate: '2026-08-28' });
+});
+protectedApi.post('/parent/maintenance/run', async (c) => {
+  const actor = parentFrom(c);
+  if (actor.role !== 'OWNER') throw new ApiError(403, 'Only the owner can run maintenance.', 'OWNER_REQUIRED');
+  const result = await runScheduledMaintenance(c.env.DB);
+  await auditStatement(c.env.DB, {
+    householdId: actor.householdId,
+    actor,
+    action: 'SCHEDULED_MAINTENANCE_RUN_MANUALLY',
+    entityType: 'HOUSEHOLD',
+    entityId: actor.householdId,
+    metadata: result,
+  }).run();
+  return c.json(result);
 });
 
 protectedApi.get('/child/home', async (c) => c.json(await childHome(c.env.DB, childFrom(c))));
