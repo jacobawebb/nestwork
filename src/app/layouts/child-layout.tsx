@@ -1,6 +1,7 @@
 import { Banknote, ClipboardList, Flag, Home, LockKeyhole } from 'lucide-react';
 import { Navigate, NavLink, Outlet } from 'react-router';
 import { Button, cx, LoadingBlock } from '@/components/ui';
+import { Avatar } from '@/components/avatar';
 import { useSession } from '@/features/auth/session';
 
 const navItems = [
@@ -17,7 +18,7 @@ export default function ChildLayout() {
   return (
     <div className="child-shell">
       <header className="child-header">
-        <div><span className="child-greeting">Hi, {session.actor.displayName}!</span><span className="child-subtitle">Your household board</span></div>
+        <div className="child-identity"><Avatar avatarKey={session.actor.avatarKey} accentKey={session.actor.accentKey} size="sm" /><div><span className="child-greeting">Hi, {session.actor.displayName}!</span><span className="child-subtitle">Your household board</span></div></div>
         <Button variant="secondary" size="sm" onClick={() => void lock()}><LockKeyhole size={18} />Switch user</Button>
       </header>
       <main className="child-main"><Outlet /></main>

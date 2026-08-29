@@ -50,7 +50,7 @@ export async function unlockSetup(env: Env, providedSecret: string, ip: string):
 interface SetupResult {
   sessionToken: string;
   invitationLinks: Array<{ email: string; token: string }>;
-  actor: { id: string; displayName: string; householdId: string; role: 'OWNER'; idleExpiresAt: string };
+  actor: { id: string; displayName: string; avatarKey: string; accentKey: string; householdId: string; role: 'OWNER'; idleExpiresAt: string };
 }
 
 export async function completeSetup(
@@ -207,6 +207,8 @@ export async function completeSetup(
     actor: {
       id: ownerId,
       displayName: input.owner.displayName,
+      avatarKey: input.owner.avatarKey,
+      accentKey: input.owner.accentKey,
       householdId,
       role: 'OWNER',
       idleExpiresAt: idleExpiry(now),

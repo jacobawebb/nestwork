@@ -15,6 +15,8 @@ export type Actor =
       id: string;
       householdId: string;
       displayName: string;
+      avatarKey: string;
+      accentKey: string;
       role: ParentRole;
       sessionHash: string;
       idleExpiresAt: string;
@@ -24,6 +26,8 @@ export type Actor =
       id: string;
       householdId: string;
       displayName: string;
+      avatarKey: string;
+      accentKey: string;
       sessionHash: string;
       idleExpiresAt: string;
     };

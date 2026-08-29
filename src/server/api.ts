@@ -96,6 +96,8 @@ function publicSession(actor: Actor) {
       type: actor.type === 'CHILD' ? 'CHILD' : 'PARENT',
       role: actor.type === 'CHILD' ? 'CHILD' : actor.role,
       displayName: actor.displayName,
+      avatarKey: actor.avatarKey,
+      accentKey: actor.accentKey,
       householdId: actor.householdId,
     },
     idleExpiresAt: actor.idleExpiresAt,

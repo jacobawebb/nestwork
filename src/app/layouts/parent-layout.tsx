@@ -2,6 +2,7 @@ import { Banknote, ClipboardList, Home, House, LockKeyhole, Settings, Users } fr
 import { Navigate, NavLink, Outlet } from 'react-router';
 import { useSession } from '@/features/auth/session';
 import { Button, cx, LoadingBlock } from '@/components/ui';
+import { Avatar } from '@/components/avatar';
 
 const navItems = [
   { to: '/parent', label: 'Dashboard', icon: Home, end: true },
@@ -27,6 +28,7 @@ export default function ParentLayout() {
           ))}
         </nav>
         <div className="parent-profile">
+          <Avatar avatarKey={session.actor.avatarKey} accentKey={session.actor.accentKey} size="sm" />
           <div><span className="parent-profile-name">{session.actor.displayName}</span><span>{session.actor.role === 'OWNER' ? 'Household owner' : 'Parent'}</span></div>
           <Button variant="quiet" size="sm" onClick={() => void lock()} aria-label="Lock and switch user"><LockKeyhole size={19} /></Button>
         </div>

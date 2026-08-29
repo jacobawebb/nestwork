@@ -4,6 +4,8 @@ export interface Session {
     type: 'PARENT' | 'CHILD';
     role: 'OWNER' | 'PARENT' | 'CHILD';
     displayName: string;
+    avatarKey: string;
+    accentKey: string;
     householdId: string;
   };
   idleExpiresAt: string;

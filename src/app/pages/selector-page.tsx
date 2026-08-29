@@ -58,7 +58,7 @@ export default function SelectorPage() {
   };
 
   return (
-    <main className="selector-page">
+    <main className="selector-page" data-theme={selected?.accentKey ?? 'teal'}>
       <div className="selector-brand" aria-hidden="true"><ShieldCheck /></div>
       <header className="selector-heading">
         <h1>Who’s using the app?</h1>
@@ -67,7 +67,7 @@ export default function SelectorPage() {
       {error ? <InlineNotice tone="error">{error} <Button variant="quiet" size="sm" onClick={() => void reload()}>Try again</Button></InlineNotice> : null}
       <div className="profile-grid" aria-label={`${data?.householdName ?? 'Household'} profiles`}>
         {data?.profiles.map((profile) => (
-          <button key={profile.id} type="button" className="profile-card" onClick={() => choose(profile)}>
+          <button key={profile.id} type="button" className="profile-card" data-theme={profile.accentKey} onClick={() => choose(profile)}>
             <Avatar avatarKey={profile.avatarKey} accentKey={profile.accentKey} size="lg" />
             <strong>{profile.displayName}</strong>
             <span>{profile.label}</span>

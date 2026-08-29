@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, postJson } from '@/lib/api-client';
 import type { Session } from '@/app/types';
+import { normalizeAccentKey } from '@/lib/theme';
 
 interface SessionContextValue {
   session: Session | null;
@@ -18,6 +19,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const lockTimer = useRef<number | null>(null);
   const touchTimer = useRef<number | null>(null);
   const expiryRef = useRef<number>(0);
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = normalizeAccentKey(session?.actor.accentKey);
+  }, [session?.actor.accentKey]);
 
   const clearTimers = useCallback(() => {
     if (lockTimer.current !== null) window.clearTimeout(lockTimer.current);

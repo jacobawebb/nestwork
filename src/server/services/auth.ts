@@ -17,6 +17,8 @@ interface ParentRow {
   id: string;
   household_id: string;
   display_name: string;
+  avatar_key: string;
+  accent_key: string;
   role: 'OWNER' | 'PARENT';
   email: string;
   password_hash: string;
@@ -26,6 +28,8 @@ interface ChildRow {
   id: string;
   household_id: string;
   display_name: string;
+  avatar_key: string;
+  accent_key: string;
   pin_hash: string;
 }
 
@@ -88,7 +92,7 @@ export async function loginParent(
   }
   const parent = await first<ParentRow>(
     db,
-    `SELECT id, household_id, display_name, role, email, password_hash
+    `SELECT id, household_id, display_name, avatar_key, accent_key, role, email, password_hash
      FROM parent_users WHERE id = ? AND active = 1`,
     input.profileId,
   );
@@ -127,6 +131,8 @@ export async function loginParent(
       id: parent.id,
       householdId: parent.household_id,
       displayName: parent.display_name,
+      avatarKey: parent.avatar_key,
+      accentKey: parent.accent_key,
       role: parent.role,
       idleExpiresAt: expiry,
     },
@@ -146,7 +152,7 @@ export async function loginChild(
   }
   const child = await first<ChildRow>(
     db,
-    'SELECT id, household_id, display_name, pin_hash FROM children WHERE id = ? AND active = 1',
+    'SELECT id, household_id, display_name, avatar_key, accent_key, pin_hash FROM children WHERE id = ? AND active = 1',
     input.profileId,
   );
   const valid = await verifyCredential(input.pin, child?.pin_hash ?? DUMMY_CREDENTIAL_HASH);
@@ -170,6 +176,8 @@ export async function loginChild(
       id: child.id,
       householdId: child.household_id,
       displayName: child.display_name,
+      avatarKey: child.avatar_key,
+      accentKey: child.accent_key,
       idleExpiresAt: expiry,
     },
   };
@@ -182,11 +190,13 @@ export async function resolveParentSession(db: D1Database, token: string, touch:
     id: string;
     household_id: string;
     display_name: string;
+    avatar_key: string;
+    accent_key: string;
     role: 'OWNER' | 'PARENT';
     idle_expires_at: string;
   }>(
     db,
-    `SELECT p.id, p.household_id, p.display_name, p.role, s.idle_expires_at
+    `SELECT p.id, p.household_id, p.display_name, p.avatar_key, p.accent_key, p.role, s.idle_expires_at
      FROM parent_sessions s JOIN parent_users p ON p.id = s.parent_user_id
      WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.idle_expires_at > ? AND p.active = 1`,
     tokenHash,
@@ -212,6 +222,8 @@ export async function resolveParentSession(db: D1Database, token: string, touch:
     id: row.id,
     householdId: row.household_id,
     displayName: row.display_name,
+    avatarKey: row.avatar_key,
+    accentKey: row.accent_key,
     role: row.role,
     sessionHash: tokenHash,
     idleExpiresAt: expiresAt,
@@ -221,9 +233,9 @@ export async function resolveParentSession(db: D1Database, token: string, touch:
 export async function resolveChildSession(db: D1Database, token: string, touch: boolean): Promise<ChildActor | null> {
   const tokenHash = await sha256(token);
   const now = new Date();
-  const row = await first<{ id: string; household_id: string; display_name: string; idle_expires_at: string }>(
+  const row = await first<{ id: string; household_id: string; display_name: string; avatar_key: string; accent_key: string; idle_expires_at: string }>(
     db,
-    `SELECT c.id, c.household_id, c.display_name, s.idle_expires_at
+    `SELECT c.id, c.household_id, c.display_name, c.avatar_key, c.accent_key, s.idle_expires_at
      FROM child_sessions s JOIN children c ON c.id = s.child_id
      WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.idle_expires_at > ? AND c.active = 1`,
     tokenHash,
@@ -249,6 +261,8 @@ export async function resolveChildSession(db: D1Database, token: string, touch: 
     id: row.id,
     householdId: row.household_id,
     displayName: row.display_name,
+    avatarKey: row.avatar_key,
+    accentKey: row.accent_key,
     sessionHash: tokenHash,
     idleExpiresAt: expiresAt,
   };

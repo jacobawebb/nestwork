@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { accentKeys } from './theme';
 
 export const parentPassword = z
   .string()
@@ -12,12 +13,15 @@ export const childPin = z.string().regex(/^\d{4,6}$/, 'PIN must be 4–6 digits.
 export const email = z.string().trim().toLowerCase().email().max(254);
 export const displayName = z.string().trim().min(1).max(50);
 export const moneyMinor = z.number().int().min(0).max(100_000_000);
+export const accentKey = z.enum(accentKeys);
+export const profileAppearanceSchema = z.object({
+  avatarKey: z.string().min(1).max(30),
+  accentKey,
+});
 
-export const childInputSchema = z.object({
+export const childInputSchema = profileAppearanceSchema.extend({
   id: z.string().optional(),
   displayName,
-  avatarKey: z.string().min(1).max(30),
-  accentKey: z.string().min(1).max(20),
   pin: childPin.optional(),
 });
 
@@ -34,8 +38,8 @@ export const setupSchema = z.object({
     displayName,
     email,
     password: parentPassword,
-    avatarKey: z.string().default('grownup-1'),
-    accentKey: z.string().default('teal'),
+    avatarKey: profileAppearanceSchema.shape.avatarKey.default('grownup-1'),
+    accentKey: accentKey.default('teal'),
   }),
   children: z.array(childInputSchema.extend({ pin: childPin })).max(12),
   invitations: z.array(invitationInputSchema).max(6),

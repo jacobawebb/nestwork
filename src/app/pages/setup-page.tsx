@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { Check, ChevronLeft, ChevronRight, Copy, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router';
 import type { Session } from '@/app/types';
-import { accentOptions, Avatar, avatarOptions } from '@/components/avatar';
+import { accentOptions, Avatar, avatarOptions, ColourPicker } from '@/components/avatar';
 import { Button, Field, InlineNotice, LoadingBlock, Select, TextInput } from '@/components/ui';
 import { useSession } from '@/features/auth/session';
 import { useApiResource } from '@/hooks/use-api-resource';
@@ -107,7 +107,7 @@ export default function SetupPage() {
 
   if (completed) {
     return (
-      <main className="setup-page"><section className="setup-complete">
+      <main className="setup-page" data-theme={owner.accentKey}><section className="setup-complete">
         <div className="complete-mark"><Check /></div><h1>Your household is ready</h1>
         <p>The owner account is signed in. The shared-device lock will activate after 10 seconds without activity.</p>
         {completed.invitations.length ? <div className="invitation-results"><h2>Copy invitation links</h2><p>Each link works once and expires after seven days.</p>{completed.invitations.map((invitation) => {
@@ -120,7 +120,7 @@ export default function SetupPage() {
   }
 
   return (
-    <main className="setup-page">
+    <main className="setup-page" data-theme={owner.accentKey}>
       <div className="setup-shell">
         <ol className="setup-progress" aria-label="Setup progress">{stepNames.map((name, index) => <li key={name} className={index <= step ? 'setup-progress-active' : ''} aria-current={index === step ? 'step' : undefined}><span>{index + 1}</span><small>{name}</small></li>)}</ol>
         <section className="setup-content">
@@ -132,6 +132,7 @@ export default function SetupPage() {
           </div></> : null}
 
           {step === 1 ? <><h1>Who is the owner?</h1><p className="lead">The owner alone manages household settings, adult accounts, and invitations.</p><div className="form-grid">
+            <div className="appearance-choice" data-theme={owner.accentKey}><Avatar avatarKey={owner.avatarKey} accentKey={owner.accentKey} size="lg" label={`${owner.displayName || 'Owner'} avatar preview`} /><ColourPicker value={owner.accentKey} onChange={(accentKey) => setOwner({ ...owner, accentKey })} label="Owner colour theme" /></div>
             <Field label="Display name"><TextInput value={owner.displayName} onChange={(event) => setOwner({ ...owner, displayName: event.target.value })} autoFocus /></Field>
             <Field label="Email address"><TextInput type="email" autoComplete="username" value={owner.email} onChange={(event) => setOwner({ ...owner, email: event.target.value })} /></Field>
             <Field label="Password" hint="At least 12 characters with uppercase, lowercase, and a number."><TextInput type="password" autoComplete="new-password" value={owner.password} onChange={(event) => setOwner({ ...owner, password: event.target.value })} /></Field>
@@ -140,11 +141,12 @@ export default function SetupPage() {
 
           {step === 2 ? <><div className="setup-section-heading"><div><h1>Add people</h1><p className="lead">Children unlock with a short PIN. Other adults receive a private, single-use link.</p></div></div>
             <div className="people-builder"><div className="builder-heading"><h2>Children</h2><Button variant="secondary" onClick={addChild}><Plus size={18} />Add child</Button></div>
-              {children.length === 0 ? <p className="builder-empty">No children added yet. This is optional during setup.</p> : children.map((child, index) => <div className="person-draft" key={child.id}><Avatar avatarKey={child.avatarKey} accentKey={child.accentKey} />
+              {children.length === 0 ? <p className="builder-empty">No children added yet. This is optional during setup.</p> : children.map((child, index) => <div className="person-draft" data-theme={child.accentKey} key={child.id}><Avatar avatarKey={child.avatarKey} accentKey={child.accentKey} />
                 <Field label={`Child ${index + 1} name`}><TextInput value={child.displayName} onChange={(event) => setChildren((current) => current.map((item) => item.id === child.id ? { ...item, displayName: event.target.value } : item))} /></Field>
                 <Field label="PIN"><TextInput type="password" inputMode="numeric" pattern="[0-9]{4,6}" value={child.pin} onChange={(event) => setChildren((current) => current.map((item) => item.id === child.id ? { ...item, pin: event.target.value } : item))} /></Field>
                 <Field label="Avatar"><Select value={child.avatarKey} onChange={(event) => setChildren((current) => current.map((item) => item.id === child.id ? { ...item, avatarKey: event.target.value } : item))}>{avatarOptions.filter((option) => option.key.startsWith('child')).map((option) => <option value={option.key} key={option.key}>{option.label}</option>)}</Select></Field>
                 <Button variant="quiet" aria-label={`Remove ${child.displayName || `child ${index + 1}`}`} onClick={() => setChildren((current) => current.filter((item) => item.id !== child.id))}><Trash2 size={18} /></Button>
+                <ColourPicker className="person-colour" compact value={child.accentKey} onChange={(accentKey) => setChildren((current) => current.map((item) => item.id === child.id ? { ...item, accentKey } : item))} label={`Child ${index + 1} colour theme`} />
               </div>)}</div>
             <div className="people-builder"><div className="builder-heading"><h2>Additional adults</h2><Button variant="secondary" onClick={addInvitation}><Plus size={18} />Invite adult</Button></div>
               {invitations.length === 0 ? <p className="builder-empty">No adult invitations added. You can invite someone later.</p> : invitations.map((invitation, index) => <div className="invite-draft" key={invitation.id}><Field label={`Adult ${index + 1} email`}><TextInput type="email" value={invitation.email} onChange={(event) => setInvitations((current) => current.map((item) => item.id === invitation.id ? { ...item, email: event.target.value } : item))} /></Field><Button variant="quiet" aria-label="Remove invitation" onClick={() => setInvitations((current) => current.filter((item) => item.id !== invitation.id))}><Trash2 size={18} /></Button></div>)}</div>
