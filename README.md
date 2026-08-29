@@ -22,12 +22,12 @@ The schema is migration-only. There are no seed or demo household records in dev
 
 ## Prerequisites
 
-- Node.js 22.x (the supported runtime declared in `package.json`)
+- Node.js 24.20.0 LTS (the explicitly pinned release used by Cloudflare Builds and CI)
 - pnpm, npm, Yarn, or Bun
 - A Cloudflare account only for remote D1/deployment work; local development uses Wrangler's local D1 implementation
 - Chromium installed by Playwright when running E2E tests for the first time
 
-Do not treat an unsupported newer local Node warning as release evidence. CI and production verification use Node 22.
+Do not treat a check run under a different local Node release as release evidence. CI and Cloudflare production builds use the exact version in `.node-version`.
 
 ## Install dependencies
 
@@ -53,8 +53,10 @@ npm install
 
 ```sh
 corepack enable
-yarn install
+COREPACK_ENABLE_PROJECT_SPEC=0 yarn install
 ```
+
+On PowerShell, set `$env:COREPACK_ENABLE_PROJECT_SPEC = '0'` for the shell before running `yarn install`. This opt-out is necessary because the standard `packageManager` field intentionally pins pnpm for Cloudflare's automatic installer; standalone Yarn installations that do not use Corepack are unaffected.
 
 ### Bun
 
@@ -63,6 +65,17 @@ bun install
 ```
 
 Dependencies are exact-pinned in `package.json`, but only the pnpm lockfile is committed. npm, Yarn, and Bun may produce their own local lockfiles and a different transitive dependency graph. Use pnpm with `--frozen-lockfile` for CI, releases, and exact reproduction unless the repository intentionally adopts and commits another manager's lockfile.
+
+Cloudflare Workers Builds normally supplies its own default tool versions. This repository overrides them: `.node-version` pins Node.js 24.20.0 LTS and `package.json#packageManager` pins pnpm 11.24.0. The checked-in `pnpm-workspace.yaml` also declares the single package root explicitly, keeping the workspace valid across supported pnpm releases.
+
+For a defense-in-depth dashboard override, set these values under **Worker → Settings → Build → Build variables and secrets**:
+
+```text
+NODE_VERSION=24.20.0
+PNPM_VERSION=11.24.0
+```
+
+The repository files are version-controlled; the dashboard values make Cloudflare's dependency-install phase use the same versions even if its automatic detection changes.
 
 ### Command equivalents
 
@@ -210,7 +223,7 @@ pnpm test:e2e
 
 `pnpm check` runs typecheck, lint, the Vitest suite, and the production build. Playwright deliberately starts a second Worker on port `8790`, deletes only the validated `.wrangler/e2e-state` directory, applies migrations, completes the real setup UI, and tests Chromium at phone, tablet, and desktop viewports. Its coverage includes keyboard use, reduced motion, horizontal overflow, the full assigned-chore/review/ledger/payout/goal flow, hidden-tab expiry, and a direct protected URL after lock.
 
-GitHub Actions repeats the gates on Node 22 and installs only Chromium. Unit/integration fixtures exist only in isolated Miniflare D1 databases.
+GitHub Actions repeats the gates on Node 24.20.0 LTS and installs only Chromium. Unit/integration fixtures exist only in isolated Miniflare D1 databases.
 
 The complete section-13 requirement mapping, including the deliberately external remote-runtime gate, is recorded in [`docs/scope-verification.md`](docs/scope-verification.md).
 

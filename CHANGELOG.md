@@ -7,3 +7,4 @@
 - Isolated phone/tablet/desktop E2E coverage, D1-backed authentication lockouts, bounded recurrence, atomic claim/review/payout guards, and immutable-instance/owner invariants.
 - Cloudflare deployment, remote-runtime benchmark, backup/restore, and owner-recovery runbooks.
 - Package-manager-neutral scripts and setup guidance for pnpm, npm, Yarn, and Bun.
+- Cloudflare Builds pins for pnpm 11.24.0 and Node.js 24.20.0 LTS, with portable single-root workspace metadata.
