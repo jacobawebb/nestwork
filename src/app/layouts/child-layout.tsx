@@ -19,7 +19,7 @@ export default function ChildLayout() {
     <div className="child-shell">
       <header className="child-header">
         <div className="child-identity"><Avatar avatarKey={session.actor.avatarKey} accentKey={session.actor.accentKey} size="sm" /><div><span className="child-greeting">Hi, {session.actor.displayName}!</span><span className="child-subtitle">Your household board</span></div></div>
-        <div className="child-header-actions"><Button variant="secondary" size="sm" onClick={togglePaletteDepth} aria-label={deeperPalette ? 'Use lighter palette' : 'Use deeper palette'}>{deeperPalette ? <Sun size={18} /> : <MoonStar size={18} />}</Button><Button variant="secondary" size="sm" onClick={() => void lock()}><LockKeyhole size={18} />Switch user</Button></div>
+        <div className="child-header-actions"><Button variant="secondary" size="sm" onClick={togglePaletteDepth} aria-label={deeperPalette ? 'Use lighter palette' : 'Use deeper palette'}><span className="palette-toggle-icon" data-deep={deeperPalette}><Sun size={18} /><MoonStar size={18} /></span></Button><Button variant="secondary" size="sm" onClick={() => void lock()}><LockKeyhole size={18} />Switch user</Button></div>
       </header>
       <main className="child-main"><Outlet /></main>
       <nav className="child-nav" aria-label="Child navigation">

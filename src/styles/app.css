@@ -139,6 +139,14 @@
   a { color: inherit; }
 }
 
+/* Applied only while changing palette depth so routine interactions stay responsive. */
+html.palette-transitioning body,
+html.palette-transitioning body *,
+html.palette-transitioning body *::before,
+html.palette-transitioning body *::after {
+  transition: background-color 1000ms ease-in-out, color 1000ms ease-in-out, border-color 1000ms ease-in-out, box-shadow 1000ms ease-in-out, fill 1000ms ease-in-out, stroke 1000ms ease-in-out !important;
+}
+
 @layer components {
   .button { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-control border px-4 text-[0.925rem] font-bold transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-50; }
   .button-sm { @apply min-h-10 px-3 text-sm; }
@@ -147,6 +155,12 @@
   .button-secondary { @apply border-border bg-canvas text-ink hover:bg-surface-strong; }
   .button-danger { @apply border-coral bg-canvas text-coral hover:bg-coral-soft; }
   .button-quiet { @apply border-transparent bg-transparent text-ink hover:bg-surface; }
+  .palette-toggle-icon { @apply relative grid size-5 place-items-center overflow-hidden; }
+  .palette-toggle-icon svg { @apply absolute transition-[transform,opacity] duration-1000 ease-in-out; }
+  .palette-toggle-icon svg:first-child { transform: rotate(0deg) scale(1); opacity: 1; }
+  .palette-toggle-icon svg:last-child { transform: rotate(-110deg) scale(0.25); opacity: 0; }
+  .palette-toggle-icon[data-deep="true"] svg:first-child { transform: rotate(110deg) scale(0.25); opacity: 0; }
+  .palette-toggle-icon[data-deep="true"] svg:last-child { transform: rotate(0deg) scale(1); opacity: 1; }
   .field { @apply grid gap-1.5 text-sm font-bold text-ink; }
   .field-label { @apply leading-5; }
   .field-hint { @apply text-xs font-medium text-muted; }
@@ -426,8 +440,10 @@
   .amount-negative { @apply text-sm text-coral; }
   .settings-layout { @apply grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]; }
   .profile-appearance-panel { @apply mb-5; }
-  .profile-appearance-form { @apply grid items-start gap-5 sm:grid-cols-[auto_minmax(0,1fr)]; }
-  .profile-appearance-form > .avatar { @apply justify-self-center; }
+  .profile-appearance-form { @apply grid gap-5; }
+  .profile-appearance-details { @apply grid items-center gap-5 sm:grid-cols-[auto_minmax(0,1fr)]; }
+  .profile-appearance-details > .avatar { @apply justify-self-center; }
+  .profile-appearance-form > .colour-picker { @apply w-full; }
   .settings-aside { @apply grid content-start gap-5; }
   .section-heading h2:has(svg) { @apply flex items-center gap-2; }
   .settings-save { @apply flex justify-end border-t border-border pt-4; }

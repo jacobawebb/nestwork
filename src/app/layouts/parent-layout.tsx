@@ -30,7 +30,7 @@ export default function ParentLayout() {
         <div className="parent-profile">
           <Avatar avatarKey={session.actor.avatarKey} accentKey={session.actor.accentKey} size="sm" />
           <div><span className="parent-profile-name">{session.actor.displayName}</span><span>{session.actor.role === 'OWNER' ? 'Household owner' : 'Parent'}</span></div>
-          <Button variant="quiet" size="sm" onClick={togglePaletteDepth} aria-label={deeperPalette ? 'Use lighter palette' : 'Use deeper palette'}>{deeperPalette ? <Sun size={19} /> : <MoonStar size={19} />}</Button>
+          <Button variant="quiet" size="sm" onClick={togglePaletteDepth} aria-label={deeperPalette ? 'Use lighter palette' : 'Use deeper palette'}><span className="palette-toggle-icon" data-deep={deeperPalette}><Sun size={19} /><MoonStar size={19} /></span></Button>
           <Button variant="quiet" size="sm" onClick={() => void lock()} aria-label="Lock and switch user"><LockKeyhole size={19} /></Button>
         </div>
       </aside>

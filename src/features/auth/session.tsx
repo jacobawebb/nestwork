@@ -122,11 +122,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [clearTimers, finishLock, scheduleLock, session]);
 
   const togglePaletteDepth = useCallback(() => {
+    document.documentElement.classList.remove('palette-transitioning');
+    void document.documentElement.offsetWidth;
+    document.documentElement.classList.add('palette-transitioning');
     setDeeperPalette((current) => {
       const next = !current;
       localStorage.setItem('nestwork:palette-depth', next ? 'deep' : 'light');
       return next;
     });
+    window.setTimeout(() => document.documentElement.classList.remove('palette-transitioning'), 1_050);
   }, []);
   const value = useMemo(() => ({ session, checking, authenticate, lock, deeperPalette, togglePaletteDepth }), [session, checking, authenticate, lock, deeperPalette, togglePaletteDepth]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
