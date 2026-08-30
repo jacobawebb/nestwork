@@ -42,4 +42,26 @@ describe('D1-backed authentication lockouts', () => {
     }
     expect((await request('/login/child', { body: { profileId: fixture.childAId, pin: '2468' } })).status).toBe(429);
   });
+
+  it('returns the active avatar theme and lets a parent update their own appearance', async () => {
+    const fixture = await createFixture('profile-appearance');
+    const current = await request('/session', { cookie: fixture.ownerCookie });
+    expect(current.status).toBe(200);
+    expect(await current.json<any>()).toMatchObject({
+      session: { actor: { id: fixture.ownerId, avatarKey: 'grownup-1', accentKey: 'teal' } },
+    });
+
+    const updated = await request('/parent/profile', {
+      method: 'PUT',
+      cookie: fixture.ownerCookie,
+      body: { avatarKey: 'grownup-3', accentKey: 'violet' },
+    });
+    expect(updated.status).toBe(200);
+    expect(await updated.json<any>()).toMatchObject({
+      session: { actor: { id: fixture.ownerId, avatarKey: 'grownup-3', accentKey: 'violet' } },
+    });
+    expect(await bindings().DB.prepare('SELECT avatar_key, accent_key FROM parent_users WHERE id = ?').bind(fixture.ownerId).first()).toMatchObject({
+      avatar_key: 'grownup-3', accent_key: 'violet',
+    });
+  });
 });

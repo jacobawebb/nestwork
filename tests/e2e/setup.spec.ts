@@ -15,11 +15,13 @@ test('a fresh database is bootstrapped through the complete setup wizard', async
   await page.getByRole('textbox', { name: 'Display name' }).fill('E2E Owner');
   await page.getByRole('textbox', { name: 'Email address' }).fill('owner@e2e.test');
   await page.getByRole('textbox', { name: /Password/ }).fill('StrongPassword123');
+  await page.getByRole('radio', { name: 'Violet' }).check();
   await page.getByRole('button', { name: /Continue/ }).click();
 
   await page.getByRole('button', { name: 'Add child' }).click();
   await page.getByRole('textbox', { name: 'Child 1 name' }).fill('E2E Child');
   await page.getByRole('textbox', { name: 'PIN' }).fill('2468');
+  await page.getByRole('radio', { name: 'Coral' }).check();
   await page.getByRole('button', { name: /Continue/ }).click();
 
   await page.getByRole('checkbox', { name: /Allow a child to release/ }).check();
@@ -32,4 +34,5 @@ test('a fresh database is bootstrapped through the complete setup wizard', async
   await page.getByRole('button', { name: /Enter parent dashboard/ }).click();
   await expect(page.getByRole('heading', { name: 'Parent dashboard' })).toBeVisible();
   await expect(page.getByText('£0.00')).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'violet');
 });

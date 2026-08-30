@@ -16,6 +16,7 @@ The application is implemented end to end: first-time setup, adult invitations, 
 - One hourly scheduled handler for the current-day-plus-14-day recurrence horizon and stale-state cleanup
 - Zod contracts shared by forms, API handlers, and tests
 - scrypt credentials with unique 128-bit salts and the OWASP 16 MiB profile (`N=2^14`, `r=8`, `p=5`)
+- Profile-led colour themes: each person chooses an avatar colour, and their signed-in view uses accessible shades of that colour for its canvas, surfaces, navigation, controls, and focus states
 - Vitest with isolated Miniflare/D1 databases and Playwright against the built Worker
 
 The schema is migration-only. There are no seed or demo household records in development or deployment. Playwright creates a household only inside its disposable `.wrangler/e2e-state` database through the real `/setup` wizard.

@@ -11,6 +11,7 @@ import {
   invitationInputSchema,
   ledgerMutationSchema,
   parentPassword,
+  profileAppearanceSchema,
   reviewSchema,
   setupSchema,
 } from '@/lib/contracts';
@@ -41,6 +42,7 @@ import {
   setChildActive,
   setParentActive,
   updateChild,
+  updateParentAppearance,
   updateSettings,
   householdContext,
 } from './services/household';
@@ -185,8 +187,8 @@ app.post('/api/login/child', async (c) => {
 app.get('/api/invitations/:token', async (c) => c.json(await invitationDetails(c.env.DB, c.req.param('token'))));
 
 app.post('/api/invitations/:token/accept', async (c) => {
-  const input = await json(c, z.object({ displayName, password: parentPassword }));
-  return c.json(await acceptInvitation(c.env.DB, c.req.param('token'), input.displayName, input.password), 201);
+  const input = await json(c, z.object({ displayName, password: parentPassword }).merge(profileAppearanceSchema));
+  return c.json(await acceptInvitation(c.env.DB, c.req.param('token'), input.displayName, input.password, input), 201);
 });
 
 app.get('/api/session', async (c) => {
@@ -255,6 +257,11 @@ protectedApi.post('/parent/children/:id/active', async (c) => {
 protectedApi.post('/parent/invitations', async (c) => {
   const input = await json(c, invitationInputSchema);
   return c.json(await createInvitation(c.env.DB, parentFrom(c), input.email), 201);
+});
+protectedApi.put('/parent/profile', async (c) => {
+  const actor = parentFrom(c);
+  const appearance = await updateParentAppearance(c.env.DB, actor, await json(c, profileAppearanceSchema));
+  return c.json({ session: publicSession({ ...actor, ...appearance }) });
 });
 protectedApi.post('/parent/adults/:id/active', async (c) => {
   const input = await json(c, z.object({ active: z.boolean() }));

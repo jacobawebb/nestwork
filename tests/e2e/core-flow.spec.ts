@@ -7,6 +7,7 @@ async function loginParent(page: Page) {
   await page.getByRole('textbox', { name: 'Password' }).fill('StrongPassword123');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Parent dashboard' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'violet');
 }
 
 async function loginChild(page: Page) {
@@ -15,12 +16,19 @@ async function loginChild(page: Page) {
   await page.getByRole('textbox', { name: /PIN/ }).fill('2468');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'My chores' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'coral');
 }
 
 test('assigned chore, approval, ledger, payout, and goals work end to end', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
   await page.goto('/');
   await loginParent(page);
+  const activityBounds = await page.locator('.activity-scroll').evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return { maxHeight: Number.parseFloat(styles.maxHeight), overflowY: styles.overflowY };
+  });
+  expect(activityBounds.maxHeight).toBeGreaterThan(0);
+  expect(['auto', 'scroll']).toContain(activityBounds.overflowY);
 
   await page.getByRole('link', { name: 'Add chore', exact: true }).click();
   await page.getByRole('textbox', { name: 'Chore title' }).fill('Tidy the desk');

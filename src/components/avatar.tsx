@@ -43,7 +43,7 @@ export function ColourPicker({
             key={option.key}
           >
             <input
-              className="sr-only"
+              className="colour-option-input"
               type="radio"
               name={label}
               value={option.key}

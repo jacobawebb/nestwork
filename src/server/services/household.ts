@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { childInputSchema } from '@/lib/contracts';
+import type { childInputSchema, profileAppearanceSchema } from '@/lib/contracts';
 import { auditStatement } from '../audit';
 import { all, first } from '../db/client';
 import { ApiError, isConstraintError } from '../errors';
@@ -7,6 +7,7 @@ import { hashCredential, randomToken, sha256 } from '../security';
 import type { ParentActor } from '../types';
 
 type ChildInput = z.infer<typeof childInputSchema>;
+type ProfileAppearance = z.infer<typeof profileAppearanceSchema>;
 
 export async function householdContext(db: D1Database, householdId: string) {
   const household = await first<{
@@ -259,6 +260,26 @@ export async function updateSettings(
   return householdContext(db, actor.householdId);
 }
 
+export async function updateParentAppearance(db: D1Database, actor: ParentActor, input: ProfileAppearance) {
+  const now = new Date().toISOString();
+  const results = await db.batch([
+    db
+      .prepare('UPDATE parent_users SET avatar_key = ?, accent_key = ? WHERE id = ? AND household_id = ? AND active = 1')
+      .bind(input.avatarKey, input.accentKey, actor.id, actor.householdId),
+    auditStatement(db, {
+      householdId: actor.householdId,
+      actor,
+      action: 'PARENT_APPEARANCE_UPDATED',
+      entityType: 'PARENT_USER',
+      entityId: actor.id,
+      metadata: { avatarKey: input.avatarKey, accentKey: input.accentKey },
+      at: now,
+    }),
+  ]);
+  if (!results[0]?.meta.changes) throw new ApiError(404, 'Your profile is no longer active.', 'NOT_FOUND');
+  return input;
+}
+
 export async function createInvitation(db: D1Database, actor: ParentActor, email: string) {
   if (actor.role !== 'OWNER') throw new ApiError(403, 'Only the owner can invite adults.', 'OWNER_REQUIRED');
   const existing = await first<{ id: string }>(
@@ -311,7 +332,7 @@ export async function invitationDetails(db: D1Database, token: string) {
   return { id: invitation.id, email: invitation.email, householdName: invitation.household_name, expiresAt: invitation.expires_at };
 }
 
-export async function acceptInvitation(db: D1Database, token: string, displayName: string, password: string) {
+export async function acceptInvitation(db: D1Database, token: string, displayName: string, password: string, appearance: ProfileAppearance) {
   const details = await invitationDetails(db, token);
   const tokenHash = await sha256(token);
   const invitation = await first<{ household_id: string }>(db, 'SELECT household_id FROM parent_invitations WHERE token_hash = ?', tokenHash);
@@ -331,10 +352,10 @@ export async function acceptInvitation(db: D1Database, token: string, displayNam
         .prepare(
           `INSERT INTO parent_users
            (id, household_id, email, display_name, avatar_key, accent_key, password_hash, role, active, last_login_at, created_at)
-           SELECT ?, household_id, email, ?, 'grownup-2', 'blue', ?, 'PARENT', 1, NULL, ?
+           SELECT ?, household_id, email, ?, ?, ?, ?, 'PARENT', 1, NULL, ?
            FROM parent_invitations WHERE token_hash = ? AND accepted_at = ?`,
         )
-        .bind(id, displayName, passwordHash, now, tokenHash, now),
+        .bind(id, displayName, appearance.avatarKey, appearance.accentKey, passwordHash, now, tokenHash, now),
       auditStatement(db, {
         householdId: invitation.household_id,
         actor: { type: 'PARENT', id },
