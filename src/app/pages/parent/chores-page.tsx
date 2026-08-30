@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Archive, Ban, CalendarClock, ClipboardList, Edit3, Hand, Plus, Trash2 } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import type { Chore, Household } from '@/app/types';
@@ -101,6 +101,20 @@ function ParentInstanceActions({ chore, onChanged, onEdit }: { chore: Chore; onC
   </div>;
 }
 
+function RecurringChoreStack({ group, locale, templates, onReload, onEdit }: { group: Chore[]; locale: string; templates: Template[]; onReload: () => void | Promise<void>; onEdit: (template: Template) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const front = group[0]!;
+  const edit = (chore: Chore) => {
+    const template = templates.find((item) => item.id === chore.templateId);
+    if (template) onEdit(template);
+  };
+  return <section className="recurring-stack" aria-label={`${front.title}, ${group.length} scheduled copies`}>
+    <div className="recurring-stack-label"><CalendarClock size={16} /><span>Recurring chore</span><button type="button" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}>{expanded ? 'Hide copies' : `${group.length} scheduled copies`}</button></div>
+    <div className="recurring-stack-visual"><span className="recurring-backplate recurring-backplate-third" aria-hidden="true" /><span className="recurring-backplate recurring-backplate-second" aria-hidden="true" /><span className="recurring-backplate recurring-backplate-first" aria-hidden="true" /><div className="recurring-front-card"><ChoreCard chore={front} locale={locale} action={<ParentInstanceActions chore={front} onChanged={onReload} onEdit={() => edit(front)} />} /></div></div>
+    {expanded ? <div className="recurring-copies" aria-label="Other scheduled copies">{group.slice(1).map((chore) => <ChoreCard key={chore.id} chore={chore} locale={locale} compact action={<ParentInstanceActions chore={chore} onChanged={onReload} onEdit={() => edit(chore)} />} />)}</div> : null}
+  </section>;
+}
+
 export default function ChoresPage() {
   const [search, setSearch] = useSearchParams();
   const instances = useApiResource<Chore[]>('/parent/chores');
@@ -155,7 +169,7 @@ export default function ChoresPage() {
     <header className="page-heading"><div><h1>Chores</h1><p>Assign a chore to one or more children, edit it when plans change, and optionally save its configuration to your template library.</p></div><div className="page-actions"><Button variant="secondary" onClick={() => setCreating('GENERAL')}><Hand size={18} />General chore</Button><Button onClick={() => setCreating('ASSIGNED')}><Plus size={18} />Assigned chore</Button></div></header>
     {error || instances.error || templates.error || people.error || context.error ? <InlineNotice tone="error">{error ?? instances.error ?? templates.error ?? people.error ?? context.error}</InlineNotice> : null}
     <section className="section-panel"><div className="section-heading"><h2>Chore instances</h2><div className="filter-row"><Select aria-label="Filter by child" value={childId} onChange={(event) => setChildId(event.target.value)}><option value="ALL">All children</option>{people.data?.children.map((child) => <option key={child.id} value={child.id}>{child.displayName}</option>)}</Select><Select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="OPEN">Open and waiting</option><option value="ALL">All statuses</option><option value="COMPLETED_PENDING_REVIEW">Needs review</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option><option value="EXPIRED">Expired</option><option value="CANCELLED">Cancelled</option></Select><TextInput aria-label="Filter by date" type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div></div><div className="section-body chore-list">
-      {visibleGroups.map((group) => <div key={group[0]!.id} className={group.length > 1 ? 'recurring-stack' : undefined}>{group.length > 1 ? <div className="recurring-stack-label"><CalendarClock size={16} />{group[0]!.title}<span>{group.length} scheduled copies</span></div> : null}{group.map((chore, index) => <div key={chore.id} className={group.length > 1 ? 'recurring-stack-card' : undefined} style={group.length > 1 ? { '--stack-index': index } as CSSProperties : undefined}><ChoreCard chore={chore} locale={locale} compact={group.length > 1 && index > 0} action={<ParentInstanceActions chore={chore} onChanged={instances.reload} onEdit={() => setEditing((templates.data ?? []).find((template) => template.id === chore.templateId) ?? null)} />}/></div>)}</div>)}
+      {visibleGroups.map((group) => group.length > 1 ? <RecurringChoreStack key={group[0]!.id} group={group} locale={locale} templates={templates.data ?? []} onReload={instances.reload} onEdit={setEditing} /> : <ChoreCard key={group[0]!.id} chore={group[0]!} locale={locale} action={<ParentInstanceActions chore={group[0]!} onChanged={instances.reload} onEdit={() => setEditing((templates.data ?? []).find((template) => template.id === group[0]!.templateId) ?? null)} />}/>) }
       {visible.length === 0 ? <EmptyState icon={<ClipboardList />} title="No chores match">Change the filters or create a new chore.</EmptyState> : null}
     </div></section>
     <section className="section-panel templates-panel"><div className="section-heading"><div><h2>Reusable templates</h2><p>Templates with generated chores are archived instead of deleted.</p></div></div><div className="template-list">
