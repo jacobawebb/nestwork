@@ -12,7 +12,7 @@ const SCRYPT_P = 5;
 const SCRYPT_SALT_BYTES = 16;
 const SCRYPT_KEY_BYTES = 32;
 const SCRYPT_MAX_MEMORY_BYTES = 32 * 1024 * 1024;
-const IDLE_MS = 10_000;
+const IDLE_MS = 30_000;
 const LOCKOUT_MS = 15 * 60_000;
 
 function bytesToBase64(bytes: Uint8Array): string {

@@ -132,6 +132,7 @@ export const choreTemplates = sqliteTable(
     currency: text('currency').notNull(),
     approvalMode: text('approval_mode').$type<'PARENT_APPROVAL' | 'AUTO_APPROVE'>().notNull(),
     recurrenceJson: text('recurrence_json').notNull(),
+    savedAsTemplate: integer('saved_as_template', { mode: 'boolean' }).notNull(),
     active: integer('active', { mode: 'boolean' }).notNull(),
     createdBy: text('created_by').notNull(),
     createdAt: text('created_at').notNull(),
@@ -167,7 +168,7 @@ export const choreInstances = sqliteTable(
     createdAt: text('created_at').notNull(),
   },
   (table) => [
-    uniqueIndex('instances_template_occurrence').on(table.templateId, table.occurrenceKey),
+    uniqueIndex('instances_template_occurrence_child').on(table.templateId, table.occurrenceKey, table.assignedChildId),
     index('instances_household_status_time').on(table.householdId, table.status, table.availableAt),
   ],
 );

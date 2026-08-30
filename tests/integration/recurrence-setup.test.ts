@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { app } from '@/server/api';
 import { runScheduledMaintenance } from '@/server/services/chores';
-import { bindings, createFixture } from './helpers';
+import { bindings, createFixture, request } from './helpers';
 
 describe('fresh setup and scheduled recurrence', () => {
   it('starts with schema only, creates setup atomically, and closes setup permanently', async () => {
@@ -49,5 +49,20 @@ describe('fresh setup and scheduled recurrence', () => {
     const second = await DB.prepare('SELECT COUNT(*) AS count FROM chore_instances WHERE template_id = ?').bind(templateId).first<{ count: number }>();
     expect(first?.count).toBe(15);
     expect(second?.count).toBe(first?.count);
+  });
+
+  it('creates a separate scheduled copy for every assigned child and keeps the library opt-in', async () => {
+    const fixture = await createFixture('multi-child');
+    const today = new Date().toISOString().slice(0, 10);
+    const created = await request('/parent/templates', {
+      cookie: fixture.ownerCookie,
+      body: { title: 'Make bedroom', instructions: 'Put everything away.', assignmentType: 'ASSIGNED', assignedChildIds: [fixture.childAId, fixture.childBId], eligibleChildIds: [], amountMinor: 150, approvalMode: 'PARENT_APPROVAL', recurrence: { kind: 'DAILY', interval: 1, startDate: today, availableTime: '00:00', dueTime: null, expiryTime: null }, saveTemplate: false },
+    });
+    expect(created.status).toBe(201);
+    const { id } = await created.json<{ id: string }>();
+    const rows = await bindings().DB.prepare('SELECT assigned_child_id FROM chore_instances WHERE template_id = ?').bind(id).all<{ assigned_child_id: string }>();
+    expect(new Set(rows.results.map((row) => row.assigned_child_id))).toEqual(new Set([fixture.childAId, fixture.childBId]));
+    const library = await request('/parent/templates', { cookie: fixture.ownerCookie });
+    expect((await library.json<any[]>()).find((template) => template.id === id)?.savedAsTemplate).toBe(false);
   });
 });

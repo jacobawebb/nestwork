@@ -78,7 +78,7 @@ describe('claim, completion, review, snapshots, and expiry', () => {
     const response = await request(`/parent/templates/${original.templateId}`, {
       cookie: fixture.ownerCookie,
       method: 'PUT',
-      body: { title: 'Changed title', instructions: null, assignmentType: 'ASSIGNED', assignedChildId: fixture.childAId, eligibleChildIds: [], amountMinor: 999, approvalMode: 'PARENT_APPROVAL', recurrence: { kind: 'ONCE', startDate: today, availableTime: '08:00', dueTime: null, expiryTime: null } },
+      body: { title: 'Changed title', instructions: null, assignmentType: 'ASSIGNED', assignedChildIds: [fixture.childAId], eligibleChildIds: [], amountMinor: 999, approvalMode: 'PARENT_APPROVAL', recurrence: { kind: 'ONCE', startDate: today, availableTime: '08:00', dueTime: null, expiryTime: null }, saveTemplate: false },
     });
     expect(response.status).toBe(200);
     const instance = await DB.prepare('SELECT title_snapshot, amount_minor_snapshot FROM chore_instances WHERE id = ?').bind(original.instanceId).first<{ title_snapshot: string; amount_minor_snapshot: number }>();

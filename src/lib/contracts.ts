@@ -85,18 +85,19 @@ export const choreTemplateInputSchema = z
     title: z.string().trim().min(1).max(80),
     instructions: z.string().trim().max(280).nullable().optional(),
     assignmentType: z.enum(['ASSIGNED', 'GENERAL']),
-    assignedChildId: z.string().uuid().nullable().optional(),
+    assignedChildIds: z.array(z.string().uuid()).max(20).default([]),
     eligibleChildIds: z.array(z.string().uuid()).max(20).default([]),
     amountMinor: moneyMinor,
     approvalMode: z.enum(['PARENT_APPROVAL', 'AUTO_APPROVE']),
     recurrence: recurrenceSchema,
+    saveTemplate: z.boolean().default(false),
   })
   .superRefine((value, ctx) => {
-    if (value.assignmentType === 'ASSIGNED' && !value.assignedChildId) {
-      ctx.addIssue({ code: 'custom', path: ['assignedChildId'], message: 'Choose a child.' });
+    if (value.assignmentType === 'ASSIGNED' && value.assignedChildIds.length === 0) {
+      ctx.addIssue({ code: 'custom', path: ['assignedChildIds'], message: 'Choose at least one child.' });
     }
-    if (value.assignmentType === 'GENERAL' && value.assignedChildId) {
-      ctx.addIssue({ code: 'custom', path: ['assignedChildId'], message: 'General chores cannot have an assignee.' });
+    if (value.assignmentType === 'GENERAL' && value.assignedChildIds.length) {
+      ctx.addIssue({ code: 'custom', path: ['assignedChildIds'], message: 'General chores cannot have assignees.' });
     }
   });
 

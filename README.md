@@ -2,7 +2,7 @@
 
 A private, shared-device household app for chores, pocket-money records, and child savings goals. Version `0.1.0` runs as one Cloudflare Worker with Static Assets, one D1 database, and one hourly Cron Trigger. It does not move money, connect to a bank, host public child accounts, or require any additional Cloudflare service.
 
-The application is implemented end to end: first-time setup, adult invitations, the shared-device profile selector, parent-password and child-PIN sessions, a server-enforced ten-second idle lock, role controls, assigned and general chores, recurrence, review, an append-only ledger, payouts/corrections, goals, audit history, and responsive phone/tablet/desktop UI.
+The application is implemented end to end: first-time setup, adult invitations, the shared-device profile selector, parent-password and child-PIN sessions, a server-enforced 30-second idle lock, role controls, multi-child assigned and general chores, recurrence, review, an append-only ledger, payouts/corrections, goals, audit history, and responsive phone/tablet/desktop UI.
 
 > Production gate: the repository includes an executable remote-runtime benchmark, but a benchmark result is deliberately not committed or claimed. Run `pnpm benchmark:remote` against the deployed Worker before declaring that deployment production-ready. See [Remote deployment benchmark](#remote-deployment-benchmark).
 
@@ -164,15 +164,15 @@ Five failed bootstrap, adult-password, or child-PIN attempts for the same target
 
 ## Chores, recurrence, and history
 
-Parents create reusable `ASSIGNED` or `GENERAL` templates. General chores may be open to all active children or a finite eligibility list. New templates use the household's configured default approval mode, but a parent can override it per template.
+Parents create `ASSIGNED` chores for one or more children, or `GENERAL` chores for the Chore Board. Each selected child receives an independent instance, so one child completing a shared household chore never completes another child's copy. A chore is only added to the reusable template library when its creator selects **Save to template library**; this keeps the library intentional rather than duplicating every scheduled chore.
 
-Schedules support one time, every N local calendar days, and selected weekdays every N local weeks. Rules are interpreted in the household IANA time zone; materialized timestamps are UTC. Only today and the following 14 local calendar days are materialized. `(template_id, occurrence_key)` uniqueness and `INSERT OR IGNORE` make repeated cron runs idempotent.
+Schedules support one time, every N local calendar days, and selected weekdays every N local weeks. Rules are interpreted in the household IANA time zone; materialized timestamps are UTC. Only today and the following 14 local calendar days are materialized. `(template_id, occurrence_key, assigned_child_id)` uniqueness and `INSERT OR IGNORE` make repeated cron runs idempotent. The parent chore list stacks equivalent recurring copies, while preserving independent actions for every child and occurrence.
 
 The hourly job advances scheduled availability, expires unfinished instances, removes old lockout rows, and fills the bounded recurrence horizon. API reads and mutations also refresh/reject expired state, so cron timing is never a correctness boundary. Parents can cancel any unfinished instance; this is especially useful for a no-expiry chore that should no longer remain open.
 
 General claims use one conditional D1 update, so only one child can win. Parent approval and auto-approval use the instance's title/value/currency/approval snapshots and a unique chore-ledger relation. Retries cannot credit twice. Return-to-child preserves the claimant and displays the parent's explanation to that child; Return to board is a separate parent action that clears a general claimant exactly once.
 
-Parents can filter instance history by child, status, and local date. Existing instances are immutable snapshots when a template changes. A template with no instances may be deleted; after any instance exists it can only be archived. Instance, ledger, and audit deletion is blocked by schema triggers.
+Parents can filter instance history by child, status, and local date, and can edit any open chore from its card. Saving an edit cancels and replaces open scheduled copies with the revised schedule; completed, reviewed, expired, and cancelled history remains immutable. A template with no instances may be deleted; after any instance exists it can only be archived. Instance, ledger, and audit deletion is blocked by schema triggers.
 
 ## Ledger and goals
 

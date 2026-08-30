@@ -109,7 +109,7 @@ export default function SetupPage() {
     return (
       <main className="setup-page" data-theme={owner.accentKey}><section className="setup-complete">
         <div className="complete-mark"><Check /></div><h1>Your household is ready</h1>
-        <p>The owner account is signed in. The shared-device lock will activate after 10 seconds without activity.</p>
+        <p>The owner account is signed in. The shared-device lock will activate after 30 seconds without activity.</p>
         {completed.invitations.length ? <div className="invitation-results"><h2>Copy invitation links</h2><p>Each link works once and expires after seven days.</p>{completed.invitations.map((invitation) => {
           const link = `${window.location.origin}/invite/${invitation.token}`;
           return <div className="copy-row" key={invitation.email}><div><strong>{invitation.email}</strong><span>{link}</span></div><Button variant="secondary" onClick={() => void navigator.clipboard.writeText(link)}><Copy size={17} />Copy</Button></div>;
@@ -165,7 +165,7 @@ export default function SetupPage() {
             <div><span>Children</span><strong>{children.length}</strong><small>{children.map((child) => child.displayName).join(', ') || 'None yet'}</small></div>
             <div><span>Other adults</span><strong>{invitations.length}</strong><small>{invitations.length ? 'Single-use invitation links will be created' : 'None invited yet'}</small></div>
             <div><span>Approval</span><strong>{settings.defaultApprovalMode === 'PARENT_APPROVAL' ? 'Parent checks by default' : 'Auto-approve by default'}</strong><small>Board limit: {settings.childBoardLimit}</small></div>
-          </div><InlineNotice tone="info">The shared-device session locks exactly 10 seconds after the last meaningful activity.</InlineNotice></> : null}
+          </div><InlineNotice tone="info">The shared-device session locks exactly 30 seconds after the last meaningful activity.</InlineNotice></> : null}
 
           {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}
           <div className="setup-actions"><Button variant="secondary" disabled={step === 0 || busy} onClick={() => { setError(null); setStep((current) => current - 1); }}><ChevronLeft size={18} />Back</Button>{step < stepNames.length - 1 ? <Button disabled={busy} onClick={next}>Continue<ChevronRight size={18} /></Button> : <Button disabled={busy} onClick={() => void finish()}>{busy ? 'Creating household…' : 'Finish setup'}<Check size={18} /></Button>}</div>

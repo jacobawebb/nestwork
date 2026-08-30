@@ -28,9 +28,9 @@ describe('Worker-compatible credential and idle security', () => {
     }
   });
 
-  it('compares bootstrap secrets safely and sets exactly a ten-second idle expiry', async () => {
+  it('compares bootstrap secrets safely and sets exactly a thirty-second idle expiry', async () => {
     expect(await secureSecretEqual('same-value', 'same-value')).toBe(true);
     expect(await secureSecretEqual('same-value', 'different-value')).toBe(false);
-    expect(idleExpiry(new Date('2026-08-28T10:00:00.000Z'))).toBe('2026-08-28T10:00:10.000Z');
+    expect(idleExpiry(new Date('2026-08-28T10:00:00.000Z'))).toBe('2026-08-28T10:00:30.000Z');
   });
 });

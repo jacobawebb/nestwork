@@ -20,6 +20,7 @@ interface TemplateRow {
   currency: string;
   approval_mode: 'PARENT_APPROVAL' | 'AUTO_APPROVE';
   recurrence_json: string;
+  saved_as_template: number;
   active: number;
 }
 
@@ -43,7 +44,7 @@ interface InstanceRow {
   completion_note: string | null;
 }
 
-function instanceInsertStatement(db: D1Database, template: TemplateRow, occurrence: ReturnType<typeof materializeHorizon>[number], now: string) {
+function instanceInsertStatement(db: D1Database, template: TemplateRow, occurrence: ReturnType<typeof materializeHorizon>[number], now: string, assignedChildId = template.assigned_child_id) {
   return db
     .prepare(
       `INSERT OR IGNORE INTO chore_instances
@@ -58,7 +59,7 @@ function instanceInsertStatement(db: D1Database, template: TemplateRow, occurren
       template.id,
       template.household_id,
       occurrence.occurrenceKey,
-      template.assigned_child_id,
+      assignedChildId,
       template.title,
       template.instructions,
       template.amount_minor,
@@ -102,7 +103,7 @@ export async function refreshTimeStates(db: D1Database, householdId?: string, no
 
 export async function createTemplate(db: D1Database, actor: ParentActor, input: ChoreInput) {
   const context = await householdContext(db, actor.householdId);
-  const childIds = input.assignmentType === 'ASSIGNED' ? [input.assignedChildId!] : input.eligibleChildIds;
+  const childIds = input.assignmentType === 'ASSIGNED' ? input.assignedChildIds : input.eligibleChildIds;
   await assertChildrenInHousehold(db, actor.householdId, childIds);
   const id = crypto.randomUUID();
   const now = new Date();
@@ -113,11 +114,12 @@ export async function createTemplate(db: D1Database, actor: ParentActor, input: 
     title: input.title,
     instructions: input.instructions ?? null,
     assignment_type: input.assignmentType,
-    assigned_child_id: input.assignmentType === 'ASSIGNED' ? input.assignedChildId! : null,
+    assigned_child_id: null,
     amount_minor: input.amountMinor,
     currency: context.currency,
     approval_mode: input.approvalMode,
     recurrence_json: JSON.stringify(input.recurrence),
+    saved_as_template: Number(input.saveTemplate),
     active: 1,
   };
   const occurrences = materializeHorizon(input.recurrence, context.timeZone, now);
@@ -129,8 +131,8 @@ export async function createTemplate(db: D1Database, actor: ParentActor, input: 
       .prepare(
         `INSERT INTO chore_templates
          (id, household_id, title, instructions, assignment_type, assigned_child_id, amount_minor, currency,
-          approval_mode, recurrence_json, active, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+          approval_mode, recurrence_json, saved_as_template, active, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -143,19 +145,24 @@ export async function createTemplate(db: D1Database, actor: ParentActor, input: 
         template.currency,
         template.approval_mode,
         template.recurrence_json,
+        template.saved_as_template,
         actor.id,
         timestamp,
         timestamp,
       ),
   ];
-  for (const childId of input.assignmentType === 'GENERAL' ? input.eligibleChildIds : []) {
+  for (const childId of childIds) {
     statements.push(
       db
         .prepare('INSERT INTO chore_template_eligibility (template_id, child_id, household_id) VALUES (?, ?, ?)')
         .bind(id, childId, actor.householdId),
     );
   }
-  for (const occurrence of occurrences) statements.push(instanceInsertStatement(db, template, occurrence, timestamp));
+  for (const occurrence of occurrences) {
+    if (input.assignmentType === 'ASSIGNED') {
+      for (const childId of input.assignedChildIds) statements.push(instanceInsertStatement(db, template, occurrence, timestamp, childId));
+    } else statements.push(instanceInsertStatement(db, template, occurrence, timestamp));
+  }
   statements.push(
     auditStatement(db, {
       householdId: actor.householdId,
@@ -168,7 +175,7 @@ export async function createTemplate(db: D1Database, actor: ParentActor, input: 
     }),
   );
   await db.batch(statements);
-  return { id, instancesCreated: occurrences.length };
+  return { id, instancesCreated: occurrences.length * (input.assignmentType === 'ASSIGNED' ? input.assignedChildIds.length : 1) };
 }
 
 export async function listTemplates(db: D1Database, actor: ParentActor) {
@@ -178,7 +185,7 @@ export async function listTemplates(db: D1Database, actor: ParentActor) {
      FROM chore_templates t
      LEFT JOIN chore_instances i ON i.template_id = t.id
      LEFT JOIN chore_template_eligibility e ON e.template_id = t.id
-     WHERE t.household_id = ? GROUP BY t.id ORDER BY t.active DESC, t.created_at DESC`,
+    WHERE t.household_id = ? GROUP BY t.id ORDER BY t.active DESC, t.created_at DESC`,
     actor.householdId,
   );
   return rows.map((row) => ({
@@ -186,13 +193,14 @@ export async function listTemplates(db: D1Database, actor: ParentActor) {
     title: row.title,
     instructions: row.instructions,
     assignmentType: row.assignment_type,
-    assignedChildId: row.assigned_child_id,
+    assignedChildIds: row.eligibility ? row.eligibility.split(',') : row.assigned_child_id ? [row.assigned_child_id] : [],
     eligibleChildIds: row.eligibility ? row.eligibility.split(',') : [],
     amountMinor: row.amount_minor,
     currency: row.currency,
     approvalMode: row.approval_mode,
     recurrence: JSON.parse(row.recurrence_json),
     active: Boolean(row.active),
+    savedAsTemplate: Boolean(row.saved_as_template),
     instanceCount: row.instance_count,
   }));
 }
@@ -200,35 +208,57 @@ export async function listTemplates(db: D1Database, actor: ParentActor) {
 export async function updateTemplate(db: D1Database, actor: ParentActor, templateId: string, input: ChoreInput) {
   const existing = await first<TemplateRow>(db, 'SELECT * FROM chore_templates WHERE id = ? AND household_id = ?', templateId, actor.householdId);
   if (!existing) throw new ApiError(404, 'Chore template not found.', 'NOT_FOUND');
-  const childIds = input.assignmentType === 'ASSIGNED' ? [input.assignedChildId!] : input.eligibleChildIds;
+  const childIds = input.assignmentType === 'ASSIGNED' ? input.assignedChildIds : input.eligibleChildIds;
   await assertChildrenInHousehold(db, actor.householdId, childIds);
-  const now = new Date().toISOString();
+  const nowDate = new Date();
+  const now = nowDate.toISOString();
+  const context = await householdContext(db, actor.householdId);
+  const refreshed: TemplateRow = {
+    ...existing,
+    title: input.title,
+    instructions: input.instructions ?? null,
+    assignment_type: input.assignmentType,
+    assigned_child_id: null,
+    amount_minor: input.amountMinor,
+    approval_mode: input.approvalMode,
+    recurrence_json: JSON.stringify(input.recurrence),
+    saved_as_template: Number(input.saveTemplate),
+  };
+  const occurrences = materializeHorizon(input.recurrence, context.timeZone, nowDate);
   const statements: D1PreparedStatement[] = [
     db
       .prepare(
         `UPDATE chore_templates SET title = ?, instructions = ?, assignment_type = ?, assigned_child_id = ?,
-         amount_minor = ?, approval_mode = ?, recurrence_json = ?, updated_at = ? WHERE id = ? AND household_id = ?`,
+         amount_minor = ?, approval_mode = ?, recurrence_json = ?, saved_as_template = ?, updated_at = ? WHERE id = ? AND household_id = ?`,
       )
       .bind(
         input.title,
         input.instructions ?? null,
         input.assignmentType,
-        input.assignmentType === 'ASSIGNED' ? input.assignedChildId! : null,
+        null,
         input.amountMinor,
         input.approvalMode,
         JSON.stringify(input.recurrence),
+        Number(input.saveTemplate),
         now,
         templateId,
         actor.householdId,
       ),
     db.prepare('DELETE FROM chore_template_eligibility WHERE template_id = ?').bind(templateId),
+    db.prepare(`UPDATE chore_instances SET status = 'CANCELLED', reviewed_at = ?, reviewer_id = ?
+      WHERE template_id = ? AND household_id = ? AND status IN ('SCHEDULED','AVAILABLE','CLAIMED','RETURNED_TO_CHILD')`).bind(now, actor.id, templateId, actor.householdId),
   ];
-  for (const childId of input.assignmentType === 'GENERAL' ? input.eligibleChildIds : []) {
+  for (const childId of childIds) {
     statements.push(
       db
         .prepare('INSERT INTO chore_template_eligibility (template_id, child_id, household_id) VALUES (?, ?, ?)')
         .bind(templateId, childId, actor.householdId),
     );
+  }
+  for (const occurrence of occurrences) {
+    if (input.assignmentType === 'ASSIGNED') {
+      for (const childId of input.assignedChildIds) statements.push(instanceInsertStatement(db, refreshed, occurrence, now, childId));
+    } else statements.push(instanceInsertStatement(db, refreshed, occurrence, now));
   }
   statements.push(
     auditStatement(db, {
@@ -237,7 +267,7 @@ export async function updateTemplate(db: D1Database, actor: ParentActor, templat
       action: 'CHORE_TEMPLATE_UPDATED',
       entityType: 'CHORE_TEMPLATE',
       entityId: templateId,
-      metadata: { existingInstancesRemainSnapshotted: true },
+      metadata: { refreshedOpenInstances: true, assignedChildCount: input.assignedChildIds.length },
       at: now,
     }),
   );
@@ -501,17 +531,25 @@ export async function cancelChore(db: D1Database, actor: ParentActor, instanceId
 
 export async function runScheduledMaintenance(db: D1Database, now = new Date()) {
   await refreshTimeStates(db, undefined, now);
-  const templates = await all<TemplateRow & { time_zone: string }>(
+  const templates = await all<TemplateRow & { time_zone: string; eligibility: string | null }>(
     db,
-    `SELECT t.*, h.time_zone FROM chore_templates t JOIN households h ON h.id = t.household_id WHERE t.active = 1`,
+    `SELECT t.*, h.time_zone, GROUP_CONCAT(e.child_id) AS eligibility
+     FROM chore_templates t JOIN households h ON h.id = t.household_id
+     LEFT JOIN chore_template_eligibility e ON e.template_id = t.id
+     WHERE t.active = 1 GROUP BY t.id`,
   );
   let attempted = 0;
   const timestamp = now.toISOString();
   for (const template of templates) {
     const occurrences = materializeHorizon(JSON.parse(template.recurrence_json), template.time_zone, now);
     if (!occurrences.length) continue;
-    attempted += occurrences.length;
-    await db.batch(occurrences.map((occurrence) => instanceInsertStatement(db, template, occurrence, timestamp)));
+    const assignedChildIds = template.assignment_type === 'ASSIGNED'
+      ? (template.eligibility ? template.eligibility.split(',') : template.assigned_child_id ? [template.assigned_child_id] : [])
+      : [];
+    attempted += occurrences.length * Math.max(1, assignedChildIds.length);
+    await db.batch(occurrences.flatMap((occurrence) => assignedChildIds.length
+      ? assignedChildIds.map((childId) => instanceInsertStatement(db, template, occurrence, timestamp, childId))
+      : [instanceInsertStatement(db, template, occurrence, timestamp)]));
   }
   await run(db, 'DELETE FROM auth_attempts WHERE locked_until IS NOT NULL AND locked_until < ?', new Date(now.getTime() - 86_400_000).toISOString());
   return { templates: templates.length, occurrencesAttempted: attempted };

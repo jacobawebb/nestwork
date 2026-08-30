@@ -34,6 +34,7 @@ test('assigned chore, approval, ledger, payout, and goals work end to end', asyn
   await page.getByRole('textbox', { name: 'Chore title' }).fill('Tidy the desk');
   await page.getByRole('textbox', { name: 'Earning amount' }).fill('1.25');
   await page.getByRole('textbox', { name: /Short instructions/ }).fill('Put papers away and leave the surface clear.');
+  await page.getByRole('checkbox', { name: 'E2E Child' }).check();
   await page.getByRole('textbox', { name: 'Available at' }).fill('00:00');
   await page.getByRole('button', { name: 'Create chore' }).click();
   await expect(page.getByRole('heading', { name: 'Tidy the desk' }).first()).toBeVisible();
@@ -83,7 +84,7 @@ test('assigned chore, approval, ledger, payout, and goals work end to end', asyn
   await expect(page.getByRole('heading', { name: 'Day out' }).locator('..')).toContainText('Spotlight');
 });
 
-test('the client and server lock a hidden child session at the ten-second boundary', async ({ page, context }, testInfo) => {
+test('the client and server lock a hidden child session at the thirty-second boundary', async ({ page, context }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
   await page.goto('/');
   await page.getByRole('button', { name: 'E2E Child Child' }).click();
@@ -93,12 +94,12 @@ test('the client and server lock a hidden child session at the ten-second bounda
   await expect(page.getByRole('heading', { name: 'My chores' })).toBeVisible();
   const cover = await context.newPage();
   await cover.goto('about:blank');
-  await cover.waitForTimeout(10_300);
+  await cover.waitForTimeout(30_300);
   await page.bringToFront();
   await expect(page.getByRole('heading', { name: 'Who’s using the app?' })).toBeVisible({ timeout: 2_000 });
   const elapsed = Date.now() - startedAt;
-  expect(elapsed).toBeGreaterThanOrEqual(9_900);
-  expect(elapsed).toBeLessThan(13_000);
+  expect(elapsed).toBeGreaterThanOrEqual(29_900);
+  expect(elapsed).toBeLessThan(33_000);
   await page.goto('/child');
   await expect(page.getByRole('heading', { name: 'Who’s using the app?' })).toBeVisible();
 });
