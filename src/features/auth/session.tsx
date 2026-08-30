@@ -8,6 +8,8 @@ interface SessionContextValue {
   checking: boolean;
   authenticate: (session: Session) => void;
   lock: () => Promise<void>;
+  deeperPalette: boolean;
+  togglePaletteDepth: () => void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -16,13 +18,15 @@ const MEANINGFUL_EVENTS: Array<keyof WindowEventMap> = ['pointerdown', 'touchsta
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
+  const [deeperPalette, setDeeperPalette] = useState(() => localStorage.getItem('nestwork:palette-depth') === 'deep');
   const lockTimer = useRef<number | null>(null);
   const touchTimer = useRef<number | null>(null);
   const expiryRef = useRef<number>(0);
 
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = normalizeAccentKey(session?.actor.accentKey);
-  }, [session?.actor.accentKey]);
+    document.documentElement.dataset.paletteDepth = deeperPalette ? 'deep' : 'light';
+  }, [deeperPalette, session?.actor.accentKey]);
 
   const clearTimers = useCallback(() => {
     if (lockTimer.current !== null) window.clearTimeout(lockTimer.current);
@@ -84,7 +88,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (!session) return;
     const meaningfulActivity = () => {
       // Start the usability boundary at the actual event, not after the request.
-      scheduleLock(Date.now() + 10_000);
+      scheduleLock(Date.now() + 30_000);
       if (touchTimer.current !== null) return;
       touchTimer.current = window.setTimeout(() => {
         touchTimer.current = null;
@@ -117,7 +121,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [clearTimers, finishLock, scheduleLock, session]);
 
-  const value = useMemo(() => ({ session, checking, authenticate, lock }), [session, checking, authenticate, lock]);
+  const togglePaletteDepth = useCallback(() => {
+    setDeeperPalette((current) => {
+      const next = !current;
+      localStorage.setItem('nestwork:palette-depth', next ? 'deep' : 'light');
+      return next;
+    });
+  }, []);
+  const value = useMemo(() => ({ session, checking, authenticate, lock, deeperPalette, togglePaletteDepth }), [session, checking, authenticate, lock, deeperPalette, togglePaletteDepth]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

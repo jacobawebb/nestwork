@@ -1,4 +1,4 @@
-import { Banknote, ClipboardList, Home, House, LockKeyhole, Settings, Users } from 'lucide-react';
+import { Banknote, ClipboardList, Home, House, LockKeyhole, MoonStar, Settings, Sun, Users } from 'lucide-react';
 import { Navigate, NavLink, Outlet } from 'react-router';
 import { useSession } from '@/features/auth/session';
 import { Button, cx, LoadingBlock } from '@/components/ui';
@@ -13,7 +13,7 @@ const navItems = [
 ];
 
 export default function ParentLayout() {
-  const { session, checking, lock } = useSession();
+  const { session, checking, lock, deeperPalette, togglePaletteDepth } = useSession();
   if (checking) return <LoadingBlock label="Checking your profile…" />;
   if (!session || session.actor.type !== 'PARENT') return <Navigate to="/" replace />;
   return (
@@ -30,6 +30,7 @@ export default function ParentLayout() {
         <div className="parent-profile">
           <Avatar avatarKey={session.actor.avatarKey} accentKey={session.actor.accentKey} size="sm" />
           <div><span className="parent-profile-name">{session.actor.displayName}</span><span>{session.actor.role === 'OWNER' ? 'Household owner' : 'Parent'}</span></div>
+          <Button variant="quiet" size="sm" onClick={togglePaletteDepth} aria-label={deeperPalette ? 'Use lighter palette' : 'Use deeper palette'}>{deeperPalette ? <Sun size={19} /> : <MoonStar size={19} />}</Button>
           <Button variant="quiet" size="sm" onClick={() => void lock()} aria-label="Lock and switch user"><LockKeyhole size={19} /></Button>
         </div>
       </aside>

@@ -23,6 +23,7 @@
 }
 
 :root, [data-theme="teal"] {
+  --color-palette-primary: #177f7c;
   --color-canvas: #f8fdfc;
   --color-surface: #edf8f7;
   --color-surface-strong: #d9eeeb;
@@ -36,6 +37,7 @@
 }
 
 [data-theme="blue"] {
+  --color-palette-primary: #4b73bd;
   --color-canvas: #f8faff;
   --color-surface: #eef3fd;
   --color-surface-strong: #dce6f8;
@@ -49,6 +51,7 @@
 }
 
 [data-theme="coral"] {
+  --color-palette-primary: #c95f50;
   --color-canvas: #fff9f7;
   --color-surface: #fdf0ec;
   --color-surface-strong: #f6ddd6;
@@ -62,6 +65,7 @@
 }
 
 [data-theme="ochre"] {
+  --color-palette-primary: #a76508;
   --color-canvas: #fffbf4;
   --color-surface: #fff3df;
   --color-surface-strong: #f4e2c2;
@@ -75,6 +79,7 @@
 }
 
 [data-theme="green"] {
+  --color-palette-primary: #3f8059;
   --color-canvas: #f8fcf8;
   --color-surface: #edf7ef;
   --color-surface-strong: #d9eadc;
@@ -88,6 +93,7 @@
 }
 
 [data-theme="violet"] {
+  --color-palette-primary: #7259a9;
   --color-canvas: #fbf9ff;
   --color-surface: #f3effb;
   --color-surface-strong: #e5ddf4;
@@ -98,6 +104,25 @@
   --color-primary-dark: #57408d;
   --color-primary-soft: #e8e0f6;
   --color-focus: #654ba0;
+}
+
+[data-theme="indigo"] { --color-palette-primary: #5865b4; --color-canvas: #fafaff; --color-surface: #f0f1fc; --color-surface-strong: #dfe2f5; --color-ink: #292d4d; --color-muted: #69708f; --color-border: #cbd0e8; --color-primary: #5865b4; --color-primary-dark: #3f4c96; --color-primary-soft: #e1e4f7; --color-focus: #4d5bad; }
+[data-theme="rose"] { --color-palette-primary: #b95377; --color-canvas: #fff9fb; --color-surface: #fdf0f4; --color-surface-strong: #f4dce5; --color-ink: #512c3b; --color-muted: #8b6473; --color-border: #e8cbd5; --color-primary: #b95377; --color-primary-dark: #963d5e; --color-primary-soft: #f8dde6; --color-focus: #ae496d; }
+[data-theme="sky"] { --color-palette-primary: #317f9f; --color-canvas: #f8fcff; --color-surface: #edf7fb; --color-surface-strong: #d9ebf2; --color-ink: #1f3d49; --color-muted: #5d7a86; --color-border: #c6dde6; --color-primary: #317f9f; --color-primary-dark: #216882; --color-primary-soft: #d9eef5; --color-focus: #287794; }
+[data-theme="berry"] { --color-palette-primary: #8f4d87; --color-canvas: #fff9fe; --color-surface: #f9eff8; --color-surface-strong: #edddec; --color-ink: #4b2948; --color-muted: #846381; --color-border: #e1cde0; --color-primary: #8f4d87; --color-primary-dark: #703768; --color-primary-soft: #f0dff0; --color-focus: #83457b; }
+
+/* A deep palette keeps the selected hue at every UI layer rather than switching to neutral black. */
+[data-palette-depth="deep"] {
+  --color-canvas: color-mix(in srgb, var(--color-palette-primary) 18%, #080b10);
+  --color-surface: color-mix(in srgb, var(--color-palette-primary) 28%, #0a1015);
+  --color-surface-strong: color-mix(in srgb, var(--color-palette-primary) 42%, #111a20);
+  --color-ink: #f5f8fa;
+  --color-muted: color-mix(in srgb, var(--color-primary-soft) 65%, #c5d0d5);
+  --color-border: color-mix(in srgb, var(--color-palette-primary) 46%, #334047);
+  --color-primary: color-mix(in srgb, var(--color-palette-primary) 72%, white);
+  --color-primary-dark: color-mix(in srgb, var(--color-palette-primary) 82%, white);
+  --color-primary-soft: color-mix(in srgb, var(--color-palette-primary) 26%, #172127);
+  --color-focus: color-mix(in srgb, var(--color-palette-primary) 78%, white);
 }
 
 @layer base {
@@ -149,14 +174,21 @@
   .avatar-lg { @apply size-24; }
   .colour-picker { @apply min-w-0 rounded-card border border-border bg-surface/55 p-3; }
   .colour-picker legend { @apply px-1 text-sm font-extrabold text-ink; }
-  .colour-options { @apply flex flex-wrap gap-2; }
-  .colour-option { @apply relative flex min-h-11 cursor-pointer items-center gap-2 rounded-control border border-border bg-canvas px-3 text-sm font-bold text-muted transition-colors hover:border-primary hover:text-ink; }
+  .colour-options { @apply grid gap-2; }
+  .colour-option { @apply relative grid min-h-16 cursor-pointer grid-cols-[5.5rem_1fr] items-center gap-3 rounded-control border border-border bg-canvas p-2 text-sm font-bold text-muted transition-colors hover:border-primary hover:text-ink; }
   .colour-option-input { @apply absolute inset-0 z-10 size-full cursor-pointer opacity-0; }
   .colour-option-selected { @apply border-primary bg-primary-soft text-primary-dark ring-2 ring-primary/15; }
-  .colour-swatch { @apply size-5 rounded-full border-2 border-canvas bg-primary shadow-[0_0_0_1px_var(--color-border)]; }
+  .colour-palette { @apply grid h-11 grid-cols-4 overflow-hidden rounded-lg border border-border shadow-sm; }
+  .colour-palette i:nth-child(1) { background: var(--color-canvas); }
+  .colour-palette i:nth-child(2) { background: var(--color-surface-strong); }
+  .colour-palette i:nth-child(3) { background: var(--color-primary); }
+  .colour-palette i:nth-child(4) { background: var(--color-ink); }
+  .colour-label { @apply grid gap-0.5; }
+  .colour-label small { @apply text-xs font-medium text-muted; }
   .colour-picker-compact { @apply border-0 bg-transparent p-0; }
-  .colour-picker-compact .colour-label { @apply sr-only; }
-  .colour-picker-compact .colour-option { @apply min-h-10 px-2.5; }
+  .colour-picker-compact .colour-option { @apply min-h-12 grid-cols-[3rem_1fr] p-1.5; }
+  .colour-picker-compact .colour-palette { @apply h-8; }
+  .colour-picker-compact .colour-label small { @apply hidden; }
   .status { @apply inline-flex min-h-7 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold; }
   .status-approved { @apply bg-success-soft text-success; }
   .status-completed_pending_review, .status-scheduled { @apply bg-ochre-soft text-ochre; }

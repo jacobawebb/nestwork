@@ -1,4 +1,4 @@
-export const accentKeys = ['teal', 'blue', 'coral', 'ochre', 'green', 'violet'] as const;
+export const accentKeys = ['teal', 'blue', 'coral', 'ochre', 'green', 'violet', 'indigo', 'rose', 'sky', 'berry'] as const;
 
 export type AccentKey = (typeof accentKeys)[number];
 
@@ -9,6 +9,10 @@ export const themeOptions: ReadonlyArray<{ key: AccentKey; label: string; avatar
   { key: 'ochre', label: 'Ochre', avatarColor: '#e9a72f' },
   { key: 'green', label: 'Green', avatarColor: '#5aa777' },
   { key: 'violet', label: 'Violet', avatarColor: '#8c78c6' },
+  { key: 'indigo', label: 'Indigo', avatarColor: '#6674c7' },
+  { key: 'rose', label: 'Rose', avatarColor: '#cf6f91' },
+  { key: 'sky', label: 'Sky', avatarColor: '#429fc4' },
+  { key: 'berry', label: 'Berry', avatarColor: '#a35b9b' },
 ];
 
 const avatarColors = Object.fromEntries(themeOptions.map(({ key, avatarColor }) => [key, avatarColor])) as Record<AccentKey, string>;

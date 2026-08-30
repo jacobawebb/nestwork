@@ -50,8 +50,8 @@ export function ColourPicker({
               checked={option.key === selected}
               onChange={() => onChange(option.key)}
             />
-            <span className="colour-swatch" aria-hidden="true" />
-            <span className="colour-label">{option.label}</span>
+            <span className="colour-palette" aria-hidden="true"><i /><i /><i /><i /></span>
+            <span className="colour-label"><strong>{option.label}</strong><small>Canvas, surface, accent, ink</small></span>
           </label>
         ))}
       </div>
