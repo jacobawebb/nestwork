@@ -53,8 +53,11 @@ import {
   completeChore,
   createTemplate,
   deleteUnusedTemplate,
+  getChildEarnedInstance,
+  getParentInstance,
   listChildInstances,
   listParentInstances,
+  listParentInstancesPage,
   listTemplates,
   releaseClaim,
   returnToBoard,
@@ -100,6 +103,7 @@ function publicSession(actor: Actor) {
       displayName: actor.displayName,
       avatarKey: actor.avatarKey,
       accentKey: actor.accentKey,
+      ...(actor.type === 'CHILD' ? { shapeKey: actor.shapeKey } : {}),
       householdId: actor.householdId,
     },
     idleExpiresAt: actor.idleExpiresAt,
@@ -227,6 +231,15 @@ protectedApi.get('/context', async (c) => {
 protectedApi.get('/parent/dashboard', async (c) => c.json(await parentDashboard(c.env.DB, parentFrom(c))));
 protectedApi.get('/parent/people', async (c) => c.json(await listPeople(c.env.DB, parentFrom(c))));
 protectedApi.get('/parent/chores', async (c) => c.json(await listParentInstances(c.env.DB, parentFrom(c))));
+protectedApi.get('/parent/chores/page', async (c) => c.json(await listParentInstancesPage(c.env.DB, parentFrom(c), {
+  page: Number(c.req.query('page')),
+  pageSize: Number(c.req.query('pageSize')),
+  search: c.req.query('search'),
+  status: c.req.query('status'),
+  childId: c.req.query('childId'),
+  date: c.req.query('date'),
+})));
+protectedApi.get('/parent/chores/:id', async (c) => c.json(await getParentInstance(c.env.DB, parentFrom(c), c.req.param('id'))));
 protectedApi.get('/parent/templates', async (c) => c.json(await listTemplates(c.env.DB, parentFrom(c))));
 protectedApi.post('/parent/templates', async (c) => c.json(await createTemplate(c.env.DB, parentFrom(c), await json(c, choreTemplateInputSchema)), 201));
 protectedApi.put('/parent/templates/:id', async (c) => c.json(await updateTemplate(c.env.DB, parentFrom(c), c.req.param('id'), await json(c, choreTemplateInputSchema))));
@@ -315,6 +328,7 @@ protectedApi.post('/parent/maintenance/run', async (c) => {
 
 protectedApi.get('/child/home', async (c) => c.json(await childHome(c.env.DB, childFrom(c))));
 protectedApi.get('/child/chores', async (c) => c.json(await listChildInstances(c.env.DB, childFrom(c))));
+protectedApi.get('/child/chores/:id', async (c) => c.json(await getChildEarnedInstance(c.env.DB, childFrom(c), c.req.param('id'))));
 protectedApi.post('/child/chores/:id/claim', async (c) => c.json(await claimChore(c.env.DB, childFrom(c), c.req.param('id'))));
 protectedApi.post('/child/chores/:id/release', async (c) => c.json(await releaseClaim(c.env.DB, childFrom(c), c.req.param('id'))));
 protectedApi.post('/child/chores/:id/complete', async (c) => {

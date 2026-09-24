@@ -29,6 +29,7 @@ export async function ledgerForParent(db: D1Database, actor: ParentActor, childI
     child_id: string;
     child_name: string;
     chore_instance_id: string | null;
+    chore_title: string | null;
     type: 'EARNING' | 'PAYOUT' | 'ADJUSTMENT' | 'REVERSAL';
     amount_minor: number;
     currency: string;
@@ -36,8 +37,9 @@ export async function ledgerForParent(db: D1Database, actor: ParentActor, childI
     created_at: string;
   }>(
     db,
-    `SELECT l.*, c.display_name AS child_name FROM ledger_entries l
+    `SELECT l.*, c.display_name AS child_name, i.title_snapshot AS chore_title FROM ledger_entries l
      JOIN children c ON c.id = l.child_id
+     LEFT JOIN chore_instances i ON i.id = l.chore_instance_id AND i.household_id = l.household_id
      WHERE l.household_id = ? AND (? IS NULL OR l.child_id = ?)
      ORDER BY l.created_at DESC LIMIT 300`,
     actor.householdId,
@@ -53,6 +55,7 @@ export async function ledgerForChild(db: D1Database, actor: ChildActor) {
     child_id: string;
     child_name: string;
     chore_instance_id: string | null;
+    chore_title: string | null;
     type: 'EARNING' | 'PAYOUT' | 'ADJUSTMENT' | 'REVERSAL';
     amount_minor: number;
     currency: string;
@@ -60,8 +63,9 @@ export async function ledgerForChild(db: D1Database, actor: ChildActor) {
     created_at: string;
   }>(
     db,
-    `SELECT l.*, c.display_name AS child_name FROM ledger_entries l
+    `SELECT l.*, c.display_name AS child_name, i.title_snapshot AS chore_title FROM ledger_entries l
      JOIN children c ON c.id = l.child_id
+     LEFT JOIN chore_instances i ON i.id = l.chore_instance_id AND i.household_id = l.household_id
      WHERE l.household_id = ? AND l.child_id = ? ORDER BY l.created_at DESC LIMIT 100`,
     actor.householdId,
     actor.id,
@@ -127,6 +131,7 @@ function mapLedger(row: {
   child_id: string;
   child_name: string;
   chore_instance_id: string | null;
+  chore_title: string | null;
   type: 'EARNING' | 'PAYOUT' | 'ADJUSTMENT' | 'REVERSAL';
   amount_minor: number;
   currency: string;
@@ -138,6 +143,7 @@ function mapLedger(row: {
     childId: row.child_id,
     childName: row.child_name,
     choreInstanceId: row.chore_instance_id,
+    choreTitle: row.chore_title,
     type: row.type,
     amountMinor: row.amount_minor,
     currency: row.currency,

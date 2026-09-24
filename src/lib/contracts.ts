@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { accentKeys } from './theme';
+import { accentKeys, childShapeKeys } from './theme';
 
 export const parentPassword = z
   .string()
@@ -14,6 +14,7 @@ export const email = z.string().trim().toLowerCase().email().max(254);
 export const displayName = z.string().trim().min(1).max(50);
 export const moneyMinor = z.number().int().min(0).max(100_000_000);
 export const accentKey = z.enum(accentKeys);
+export const childShapeKey = z.enum(childShapeKeys).default('circle');
 export const profileAppearanceSchema = z.object({
   avatarKey: z.string().min(1).max(30),
   accentKey,
@@ -22,6 +23,7 @@ export const profileAppearanceSchema = z.object({
 export const childInputSchema = profileAppearanceSchema.extend({
   id: z.string().optional(),
   displayName,
+  shapeKey: childShapeKey,
   pin: childPin.optional(),
 });
 

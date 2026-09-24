@@ -1,3 +1,5 @@
+import type { ChildShapeKey } from '@/lib/theme';
+
 export interface Session {
   actor: {
     id: string;
@@ -6,6 +8,7 @@ export interface Session {
     displayName: string;
     avatarKey: string;
     accentKey: string;
+    shapeKey?: ChildShapeKey;
     householdId: string;
   };
   idleExpiresAt: string;
@@ -31,6 +34,7 @@ export interface Profile {
   displayName: string;
   avatarKey: string;
   accentKey: string;
+  shapeKey: ChildShapeKey;
   label: string;
 }
 
@@ -71,6 +75,7 @@ export interface LedgerEntry {
   childId: string;
   childName: string;
   choreInstanceId: string | null;
+  choreTitle: string | null;
   type: 'EARNING' | 'PAYOUT' | 'ADJUSTMENT' | 'REVERSAL';
   amountMinor: number;
   currency: string;

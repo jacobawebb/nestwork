@@ -30,6 +30,7 @@ interface ChildRow {
   display_name: string;
   avatar_key: string;
   accent_key: string;
+  shape_key: ChildActor['shapeKey'];
   pin_hash: string;
 }
 
@@ -40,7 +41,7 @@ const DUMMY_CREDENTIAL_HASH = 'scrypt$16384$8$5$ZmFtaWx5LWNob3Jlcy1kdW1teS1sb2dp
 export async function listProfiles(db: D1Database): Promise<{
   initialized: boolean;
   householdName?: string;
-  profiles: Array<{ id: string; type: 'PARENT' | 'CHILD'; displayName: string; avatarKey: string; accentKey: string; label: string }>;
+  profiles: Array<{ id: string; type: 'PARENT' | 'CHILD'; displayName: string; avatarKey: string; accentKey: string; shapeKey: ChildActor['shapeKey']; label: string }>;
 }> {
   const household = await first<{ id: string; name: string }>(
     db,
@@ -49,10 +50,10 @@ export async function listProfiles(db: D1Database): Promise<{
   if (!household) return { initialized: false, profiles: [] };
   const result = await db
     .prepare(
-      `SELECT id, 'PARENT' AS type, display_name, avatar_key, accent_key, role AS label
+      `SELECT id, 'PARENT' AS type, display_name, avatar_key, accent_key, 'circle' AS shape_key, role AS label
        FROM parent_users WHERE household_id = ? AND active = 1
        UNION ALL
-       SELECT id, 'CHILD' AS type, display_name, avatar_key, accent_key, 'CHILD' AS label
+       SELECT id, 'CHILD' AS type, display_name, avatar_key, accent_key, shape_key, 'CHILD' AS label
        FROM children WHERE household_id = ? AND active = 1
        ORDER BY type DESC, display_name COLLATE NOCASE`,
     )
@@ -63,6 +64,7 @@ export async function listProfiles(db: D1Database): Promise<{
       display_name: string;
       avatar_key: string;
       accent_key: string;
+      shape_key: ChildActor['shapeKey'];
       label: string;
     }>();
   return {
@@ -74,6 +76,7 @@ export async function listProfiles(db: D1Database): Promise<{
       displayName: row.display_name,
       avatarKey: row.avatar_key,
       accentKey: row.accent_key,
+      shapeKey: row.shape_key,
       label: row.label === 'CHILD' ? 'Child' : 'Adult',
     })),
   };
@@ -152,7 +155,7 @@ export async function loginChild(
   }
   const child = await first<ChildRow>(
     db,
-    'SELECT id, household_id, display_name, avatar_key, accent_key, pin_hash FROM children WHERE id = ? AND active = 1',
+    'SELECT id, household_id, display_name, avatar_key, accent_key, shape_key, pin_hash FROM children WHERE id = ? AND active = 1',
     input.profileId,
   );
   const valid = await verifyCredential(input.pin, child?.pin_hash ?? DUMMY_CREDENTIAL_HASH);
@@ -178,6 +181,7 @@ export async function loginChild(
       displayName: child.display_name,
       avatarKey: child.avatar_key,
       accentKey: child.accent_key,
+      shapeKey: child.shape_key,
       idleExpiresAt: expiry,
     },
   };
@@ -233,9 +237,9 @@ export async function resolveParentSession(db: D1Database, token: string, touch:
 export async function resolveChildSession(db: D1Database, token: string, touch: boolean): Promise<ChildActor | null> {
   const tokenHash = await sha256(token);
   const now = new Date();
-  const row = await first<{ id: string; household_id: string; display_name: string; avatar_key: string; accent_key: string; idle_expires_at: string }>(
+  const row = await first<{ id: string; household_id: string; display_name: string; avatar_key: string; accent_key: string; shape_key: ChildActor['shapeKey']; idle_expires_at: string }>(
     db,
-    `SELECT c.id, c.household_id, c.display_name, c.avatar_key, c.accent_key, s.idle_expires_at
+    `SELECT c.id, c.household_id, c.display_name, c.avatar_key, c.accent_key, c.shape_key, s.idle_expires_at
      FROM child_sessions s JOIN children c ON c.id = s.child_id
      WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.idle_expires_at > ? AND c.active = 1`,
     tokenHash,
@@ -263,6 +267,7 @@ export async function resolveChildSession(db: D1Database, token: string, touch: 
     displayName: row.display_name,
     avatarKey: row.avatar_key,
     accentKey: row.accent_key,
+    shapeKey: row.shape_key,
     sessionHash: tokenHash,
     idleExpiresAt: expiresAt,
   };

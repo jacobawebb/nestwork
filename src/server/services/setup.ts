@@ -150,10 +150,10 @@ export async function completeSetup(
       env.DB
         .prepare(
           `INSERT INTO children
-           (id, household_id, display_name, avatar_key, accent_key, pin_hash, active, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+           (id, household_id, display_name, avatar_key, accent_key, shape_key, pin_hash, active, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
         )
-        .bind(child.id, householdId, child.displayName, child.avatarKey, child.accentKey, child.pinHash, timestamp, timestamp),
+        .bind(child.id, householdId, child.displayName, child.avatarKey, child.accentKey, child.shapeKey, child.pinHash, timestamp, timestamp),
       env.DB
         .prepare('INSERT INTO child_goal_preferences (child_id, spotlight_goal_id, updated_at) VALUES (?, NULL, ?)')
         .bind(child.id, timestamp),

@@ -17,6 +17,32 @@ describe('household and child authorization with ledger guards', () => {
     expect(body.actor.id).toBe(fixture.childAId);
   });
 
+  it('shows chore titles in earning history and restricts child detail to their own credited chores', async () => {
+    const fixture = await createFixture('earned-chore-detail');
+    const own = await insertTemplateAndInstance(fixture, { assignedChildId: fixture.childAId, status: 'APPROVED', title: 'Tidy the desk' });
+    const other = await insertTemplateAndInstance(fixture, { assignedChildId: fixture.childBId, status: 'APPROVED', title: 'Wash the dishes' });
+    const now = new Date().toISOString();
+    await bindings().DB.batch([own, other].map(({ instanceId }, index) => bindings().DB.prepare(
+      `INSERT INTO ledger_entries (id, household_id, child_id, chore_instance_id, type, amount_minor, currency, reason, created_by_parent_id, created_at)
+       VALUES (?, ?, ?, ?, 'EARNING', 250, 'GBP', 'Approved chore', ?, ?)`,
+    ).bind(crypto.randomUUID(), fixture.householdId, index === 0 ? fixture.childAId : fixture.childBId, instanceId, fixture.ownerId, now)));
+
+    const parentHistory = await request(`/parent/ledger?childId=${fixture.childAId}`, { cookie: fixture.ownerCookie });
+    expect(parentHistory.status).toBe(200);
+    expect(await parentHistory.json<any>()).toMatchObject([{ choreInstanceId: own.instanceId, choreTitle: 'Tidy the desk' }]);
+
+    const childHistory = await request('/child/ledger', { cookie: fixture.childACookie });
+    expect(childHistory.status).toBe(200);
+    const entries = (await childHistory.json<any>()).entries;
+    expect(entries).toMatchObject([{ choreInstanceId: own.instanceId, choreTitle: 'Tidy the desk' }]);
+    expect(JSON.stringify(entries)).not.toContain('Wash the dishes');
+
+    const ownDetail = await request(`/child/chores/${own.instanceId}`, { cookie: fixture.childACookie });
+    expect(ownDetail.status).toBe(200);
+    expect(await ownDetail.json<any>()).toMatchObject({ id: own.instanceId, title: 'Tidy the desk' });
+    expect((await request(`/child/chores/${other.instanceId}`, { cookie: fixture.childACookie })).status).toBe(404);
+  });
+
   it('blocks every parent-only mutation from a child session', async () => {
     const fixture = await createFixture('child-policy');
     const responses = await Promise.all([

@@ -27,14 +27,14 @@ export function ReviewControls({ choreId, onChanged, allowReturnToBoard = false 
 
   return <>
     <div className="review-controls">
-      <Button size="sm" onClick={() => void review('APPROVE')} disabled={busy}><Check size={16} />Approve</Button>
-      <Button variant="secondary" size="sm" onClick={() => setAction('RETURN')} disabled={busy}><RotateCcw size={16} />Try again</Button>
-      <Button variant="quiet" size="sm" onClick={() => setAction('REJECT')} disabled={busy}><X size={16} />Reject</Button>
+      <Button variant="success" size="sm" onClick={() => void review('APPROVE')} disabled={busy}><Check size={16} />Approve</Button>
+      <Button variant="warning" size="sm" onClick={() => setAction('RETURN')} disabled={busy}><RotateCcw size={16} />Try again</Button>
+      <Button variant="danger" size="sm" onClick={() => setAction('REJECT')} disabled={busy}><X size={16} />Reject</Button>
       {allowReturnToBoard ? <Button variant="secondary" size="sm" onClick={() => void returnBoard()} disabled={busy}>Return to board</Button> : null}
     </div>
     {error && !action ? <InlineNotice tone="error">{error}</InlineNotice> : null}
     {action ? <Modal title={action === 'RETURN' ? 'Send this back for another try' : 'Do not approve this chore'} onClose={() => setAction(null)}>
-      <div className="form-stack"><Field label="Kind explanation"><TextArea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={240} autoFocus /></Field>{error ? <InlineNotice tone="error">{error}</InlineNotice> : null}<div className="modal-actions"><Button variant="secondary" onClick={() => setAction(null)}>Cancel</Button><Button onClick={() => void review(action)} disabled={busy || reason.trim().length < 2}>{busy ? 'Saving…' : action === 'RETURN' ? 'Send back' : 'Reject chore'}</Button></div></div>
+      <div className="form-stack"><Field label="Kind explanation"><TextArea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={240} autoFocus /></Field>{error ? <InlineNotice tone="error">{error}</InlineNotice> : null}<div className="modal-actions"><Button variant="secondary" onClick={() => setAction(null)}>Cancel</Button><Button variant={action === 'RETURN' ? 'warning' : 'danger'} onClick={() => void review(action)} disabled={busy || reason.trim().length < 2}>{busy ? 'Saving…' : action === 'RETURN' ? 'Send back' : 'Reject chore'}</Button></div></div>
     </Modal> : null}
   </>;
 }

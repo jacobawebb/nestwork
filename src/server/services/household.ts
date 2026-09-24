@@ -62,10 +62,11 @@ export async function listPeople(db: D1Database, actor: ParentActor) {
       display_name: string;
       avatar_key: string;
       accent_key: string;
+      shape_key: ChildInput['shapeKey'];
       active: number;
     }>(
       db,
-      'SELECT id, display_name, avatar_key, accent_key, active FROM children WHERE household_id = ? ORDER BY active DESC, display_name',
+      'SELECT id, display_name, avatar_key, accent_key, shape_key, active FROM children WHERE household_id = ? ORDER BY active DESC, display_name',
       actor.householdId,
     ),
     actor.role === 'OWNER'
@@ -91,6 +92,7 @@ export async function listPeople(db: D1Database, actor: ParentActor) {
       displayName: row.display_name,
       avatarKey: row.avatar_key,
       accentKey: row.accent_key,
+      shapeKey: row.shape_key,
       active: Boolean(row.active),
     })),
     invitations: invitations.map((row) => ({
@@ -111,10 +113,10 @@ export async function createChild(db: D1Database, actor: ParentActor, input: Chi
       db
         .prepare(
           `INSERT INTO children
-           (id, household_id, display_name, avatar_key, accent_key, pin_hash, active, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+          (id, household_id, display_name, avatar_key, accent_key, shape_key, pin_hash, active, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
         )
-        .bind(id, actor.householdId, input.displayName, input.avatarKey, input.accentKey, pinHash, now, now),
+        .bind(id, actor.householdId, input.displayName, input.avatarKey, input.accentKey, input.shapeKey, pinHash, now, now),
       db.prepare('INSERT INTO child_goal_preferences (child_id, spotlight_goal_id, updated_at) VALUES (?, NULL, ?)').bind(id, now),
       auditStatement(db, {
         householdId: actor.householdId,
@@ -146,6 +148,7 @@ export async function updateChild(
     ['display_name', input.displayName],
     ['avatar_key', input.avatarKey],
     ['accent_key', input.accentKey],
+    ['shape_key', input.shapeKey],
   ] as const) {
     if (value !== undefined) {
       updates.push(`${column} = ?`);

@@ -2,13 +2,14 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { Check, ChevronLeft, ChevronRight, Copy, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router';
 import type { Session } from '@/app/types';
-import { accentOptions, Avatar, avatarOptions, ColourPicker } from '@/components/avatar';
+import { accentOptions, Avatar, avatarOptions, ChildShapePicker, ColourPicker } from '@/components/avatar';
 import { Button, Field, InlineNotice, LoadingBlock, Select, TextInput } from '@/components/ui';
 import { useSession } from '@/features/auth/session';
 import { useApiResource } from '@/hooks/use-api-resource';
 import { postJson } from '@/lib/api-client';
+import type { ChildShapeKey } from '@/lib/theme';
 
-interface ChildDraft { id: string; displayName: string; avatarKey: string; accentKey: string; pin: string }
+interface ChildDraft { id: string; displayName: string; avatarKey: string; accentKey: string; shapeKey: ChildShapeKey; pin: string }
 interface InvitationDraft { id: string; email: string }
 interface CompletedSetup { session: Session; invitations: Array<{ email: string; token: string }> }
 
@@ -57,7 +58,7 @@ export default function SetupPage() {
     finally { setBusy(false); }
   };
 
-  const addChild = () => setChildren((current) => [...current, { id: crypto.randomUUID(), displayName: '', avatarKey: 'child-1', accentKey: accentOptions[current.length % accentOptions.length]!, pin: '' }]);
+  const addChild = () => setChildren((current) => [...current, { id: crypto.randomUUID(), displayName: '', avatarKey: 'child-1', accentKey: accentOptions[current.length % accentOptions.length]!, shapeKey: 'circle', pin: '' }]);
   const addInvitation = () => setInvitations((current) => [...current, { id: crypto.randomUUID(), email: '' }]);
 
   const stepValid = () => {
@@ -109,7 +110,7 @@ export default function SetupPage() {
     return (
       <main className="setup-page" data-theme={owner.accentKey}><section className="setup-complete">
         <div className="complete-mark"><Check /></div><h1>Your household is ready</h1>
-        <p>The owner account is signed in. The shared-device lock will activate after 30 seconds without activity.</p>
+        <p>The owner account is signed in. The shared-device lock will activate after 60 seconds without activity.</p>
         {completed.invitations.length ? <div className="invitation-results"><h2>Copy invitation links</h2><p>Each link works once and expires after seven days.</p>{completed.invitations.map((invitation) => {
           const link = `${window.location.origin}/invite/${invitation.token}`;
           return <div className="copy-row" key={invitation.email}><div><strong>{invitation.email}</strong><span>{link}</span></div><Button variant="secondary" onClick={() => void navigator.clipboard.writeText(link)}><Copy size={17} />Copy</Button></div>;
@@ -147,6 +148,7 @@ export default function SetupPage() {
                 <Field label="Avatar"><Select value={child.avatarKey} onChange={(event) => setChildren((current) => current.map((item) => item.id === child.id ? { ...item, avatarKey: event.target.value } : item))}>{avatarOptions.filter((option) => option.key.startsWith('child')).map((option) => <option value={option.key} key={option.key}>{option.label}</option>)}</Select></Field>
                 <Button variant="quiet" aria-label={`Remove ${child.displayName || `child ${index + 1}`}`} onClick={() => setChildren((current) => current.filter((item) => item.id !== child.id))}><Trash2 size={18} /></Button>
                 <ColourPicker className="person-colour" compact value={child.accentKey} onChange={(accentKey) => setChildren((current) => current.map((item) => item.id === child.id ? { ...item, accentKey } : item))} label={`Child ${index + 1} colour theme`} />
+                <ChildShapePicker className="person-shape" value={child.shapeKey} onChange={(shapeKey) => setChildren((current) => current.map((item) => item.id === child.id ? { ...item, shapeKey } : item))} label={`Child ${index + 1} background shape`} />
               </div>)}</div>
             <div className="people-builder"><div className="builder-heading"><h2>Additional adults</h2><Button variant="secondary" onClick={addInvitation}><Plus size={18} />Invite adult</Button></div>
               {invitations.length === 0 ? <p className="builder-empty">No adult invitations added. You can invite someone later.</p> : invitations.map((invitation, index) => <div className="invite-draft" key={invitation.id}><Field label={`Adult ${index + 1} email`}><TextInput type="email" value={invitation.email} onChange={(event) => setInvitations((current) => current.map((item) => item.id === invitation.id ? { ...item, email: event.target.value } : item))} /></Field><Button variant="quiet" aria-label="Remove invitation" onClick={() => setInvitations((current) => current.filter((item) => item.id !== invitation.id))}><Trash2 size={18} /></Button></div>)}</div>
@@ -165,7 +167,7 @@ export default function SetupPage() {
             <div><span>Children</span><strong>{children.length}</strong><small>{children.map((child) => child.displayName).join(', ') || 'None yet'}</small></div>
             <div><span>Other adults</span><strong>{invitations.length}</strong><small>{invitations.length ? 'Single-use invitation links will be created' : 'None invited yet'}</small></div>
             <div><span>Approval</span><strong>{settings.defaultApprovalMode === 'PARENT_APPROVAL' ? 'Parent checks by default' : 'Auto-approve by default'}</strong><small>Board limit: {settings.childBoardLimit}</small></div>
-          </div><InlineNotice tone="info">The shared-device session locks exactly 30 seconds after the last meaningful activity.</InlineNotice></> : null}
+          </div><InlineNotice tone="info">The shared-device session locks exactly 60 seconds after the last meaningful activity.</InlineNotice></> : null}
 
           {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}
           <div className="setup-actions"><Button variant="secondary" disabled={step === 0 || busy} onClick={() => { setError(null); setStep((current) => current - 1); }}><ChevronLeft size={18} />Back</Button>{step < stepNames.length - 1 ? <Button disabled={busy} onClick={next}>Continue<ChevronRight size={18} /></Button> : <Button disabled={busy} onClick={() => void finish()}>{busy ? 'Creating household…' : 'Finish setup'}<Check size={18} /></Button>}</div>

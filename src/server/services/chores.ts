@@ -571,6 +571,69 @@ export async function listParentInstances(db: D1Database, actor: ParentActor) {
   return rows.map(mapInstance);
 }
 
+export async function getParentInstance(db: D1Database, actor: ParentActor, instanceId: string) {
+  await refreshTimeStates(db, actor.householdId);
+  const row = await first<InstanceRow & { child_name: string | null }>(db,
+    `SELECT i.*, COALESCE(ac.display_name, cc.display_name) AS child_name
+     FROM chore_instances i
+     LEFT JOIN children ac ON ac.id = i.assigned_child_id
+     LEFT JOIN children cc ON cc.id = i.claimed_by_child_id
+     WHERE i.household_id = ? AND i.id = ?`, actor.householdId, instanceId);
+  if (!row) throw new ApiError(404, 'Chore not found.', 'NOT_FOUND');
+  return mapInstance(row);
+}
+
+export async function getChildEarnedInstance(db: D1Database, actor: ChildActor, instanceId: string) {
+  const row = await first<InstanceRow>(db,
+    `SELECT i.* FROM chore_instances i
+     JOIN ledger_entries l ON l.chore_instance_id = i.id
+     WHERE i.household_id = ? AND i.id = ? AND l.household_id = ? AND l.child_id = ? AND l.type = 'EARNING'
+     LIMIT 1`, actor.householdId, instanceId, actor.householdId, actor.id);
+  if (!row) throw new ApiError(404, 'Chore not found.', 'NOT_FOUND');
+  return mapInstance(row);
+}
+
+export async function listParentInstancesPage(db: D1Database, actor: ParentActor, filters: {
+  page?: number; pageSize?: number; search?: string; status?: string; childId?: string; date?: string;
+}) {
+  await refreshTimeStates(db, actor.householdId);
+  const pageSize = Math.min(50, Math.max(1, Math.trunc(filters.pageSize || 12)));
+  const conditions = ['i.household_id = ?'];
+  const params: unknown[] = [actor.householdId];
+  const openStatuses = ['SCHEDULED', 'AVAILABLE', 'CLAIMED', 'RETURNED_TO_CHILD', 'COMPLETED_PENDING_REVIEW'];
+  const allowedStatuses = [...openStatuses, 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELLED'];
+  if (!filters.status || filters.status === 'OPEN') {
+    conditions.push(`i.status IN (${openStatuses.map(() => '?').join(',')})`);
+    params.push(...openStatuses);
+  } else if (allowedStatuses.includes(filters.status)) {
+    conditions.push('i.status = ?');
+    params.push(filters.status);
+  }
+  if (filters.childId && filters.childId !== 'ALL') {
+    conditions.push('(i.assigned_child_id = ? OR i.claimed_by_child_id = ?)');
+    params.push(filters.childId, filters.childId);
+  }
+  if (filters.date && /^\d{4}-\d{2}-\d{2}$/.test(filters.date)) {
+    conditions.push('i.available_at LIKE ?');
+    params.push(`${filters.date}%`);
+  }
+  const search = filters.search?.trim().slice(0, 80);
+  if (search) {
+    conditions.push('(i.title_snapshot LIKE ? OR i.instructions_snapshot LIKE ? OR ac.display_name LIKE ? OR cc.display_name LIKE ?)');
+    params.push(...Array(4).fill(`%${search}%`));
+  }
+  const from = `FROM chore_instances i LEFT JOIN children ac ON ac.id = i.assigned_child_id LEFT JOIN children cc ON cc.id = i.claimed_by_child_id WHERE ${conditions.join(' AND ')}`;
+  const count = await first<{ total: number }>(db, `SELECT COUNT(*) AS total ${from}`, ...params);
+  const total = count?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(totalPages, Math.max(1, Math.trunc(filters.page || 1)));
+  const rows = await all<InstanceRow & { child_name: string | null }>(db,
+    `SELECT i.*, COALESCE(ac.display_name, cc.display_name) AS child_name ${from}
+     ORDER BY CASE i.status WHEN 'COMPLETED_PENDING_REVIEW' THEN 0 WHEN 'AVAILABLE' THEN 1 WHEN 'CLAIMED' THEN 2 ELSE 3 END,
+       i.available_at DESC LIMIT ? OFFSET ?`, ...params, pageSize, (page - 1) * pageSize);
+  return { items: rows.map(mapInstance), page, pageSize, total, totalPages };
+}
+
 export async function listChildInstances(db: D1Database, actor: ChildActor) {
   await refreshTimeStates(db, actor.householdId);
   const context = await householdContext(db, actor.householdId);

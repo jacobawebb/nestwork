@@ -3,6 +3,7 @@ import { Navigate, NavLink, Outlet } from 'react-router';
 import { useSession } from '@/features/auth/session';
 import { Button, cx, LoadingBlock } from '@/components/ui';
 import { Avatar } from '@/components/avatar';
+import { SessionCountdown } from '@/components/session-countdown';
 
 const navItems = [
   { to: '/parent', label: 'Dashboard', icon: Home, end: true },
@@ -28,6 +29,7 @@ export default function ParentLayout() {
           ))}
         </nav>
         <div className="parent-profile">
+          <SessionCountdown />
           <Avatar avatarKey={session.actor.avatarKey} accentKey={session.actor.accentKey} size="sm" />
           <div><span className="parent-profile-name">{session.actor.displayName}</span><span>{session.actor.role === 'OWNER' ? 'Household owner' : 'Parent'}</span></div>
           <Button variant="quiet" size="sm" onClick={togglePaletteDepth} aria-label={deeperPalette ? 'Use lighter palette' : 'Use deeper palette'}><span className="palette-toggle-icon" data-deep={deeperPalette}><Sun size={19} /><MoonStar size={19} /></span></Button>

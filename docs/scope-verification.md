@@ -13,7 +13,7 @@ This table maps every required case in section 13 of the development scope to ex
 | 7 | Recurrence is idempotent. | `tests/integration/recurrence-setup.test.ts` — repeated 14-day materialisation | Verified locally |
 | 8 | Completed chore instances retain their title and amount snapshots. | `tests/integration/claim-review.test.ts` — completed-instance snapshot test | Verified locally |
 | 9 | Household identifiers cannot cross the tenancy boundary. | `tests/integration/authorization-ledger.test.ts` — cross-household identifier test | Verified locally |
-| 10 | Parent/child sessions expire at exactly 10 seconds on both client and server, including hidden tabs and direct URLs. | `tests/unit/security.test.ts`, `tests/unit/policies.test.ts`, `tests/integration/authorization-ledger.test.ts`, and `tests/e2e/core-flow.spec.ts` | Verified locally |
+| 10 | Parent/child sessions expire at exactly 60 seconds on both client and server, including hidden tabs and direct URLs. | `tests/unit/security.test.ts`, `tests/unit/policies.test.ts`, `tests/integration/authorization-ledger.test.ts`, and `tests/e2e/core-flow.spec.ts` | Verified locally |
 | 11 | Phone/tablet flows support keyboard use and reduced motion. | `tests/e2e/accessibility.spec.ts` on phone and tablet Playwright projects | Verified locally |
 | 12 | Returned general chores remain assigned until a one-time parent return-to-board. | `tests/integration/claim-review.test.ts` — returned general chore test | Verified locally |
 | 13 | Expiry creates no earning and generated templates are archive-only. | `tests/integration/claim-review.test.ts` — expiry/archive test | Verified locally |

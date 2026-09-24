@@ -2,7 +2,7 @@
 
 A private, shared-device household app for chores, pocket-money records, and child savings goals. Version `0.1.0` runs as one Cloudflare Worker with Static Assets, one D1 database, and one hourly Cron Trigger. It does not move money, connect to a bank, host public child accounts, or require any additional Cloudflare service.
 
-The application is implemented end to end: first-time setup, adult invitations, the shared-device profile selector, parent-password and child-PIN sessions, a server-enforced 30-second idle lock, role controls, multi-child assigned and general chores, recurrence, review, an append-only ledger, payouts/corrections, goals, audit history, and responsive phone/tablet/desktop UI.
+The application is implemented end to end: first-time setup, adult invitations, the shared-device profile selector, parent-password and child-PIN sessions, a server-enforced 60-second idle lock, role controls, multi-child assigned and general chores, recurrence, review, an append-only ledger, payouts/corrections, goals, audit history, and responsive phone/tablet/desktop UI.
 
 > Production gate: the repository includes an executable remote-runtime benchmark, but a benchmark result is deliberately not committed or claimed. Run `pnpm benchmark:remote` against the deployed Worker before declaring that deployment production-ready. See [Remote deployment benchmark](#remote-deployment-benchmark).
 
@@ -146,7 +146,7 @@ Household, owner, settings, initial children, invitations, and the initial owner
 
 There is exactly one active `OWNER` per household. An `OWNER` can manage household settings, invitations, and adult accounts. A `PARENT` can manage children, chores, reviews, goals, payouts, adjustments, and reversals, but cannot alter household settings or adult access. A child can act only on their own assigned/claimed chores, ledger, and active goals.
 
-## Shared-device selector and ten-second lock
+## Shared-device selector and 60-second lock
 
 After setup, `/` shows only profile names, built-in avatars, accent colours, and Adult/Child labels. It never includes balances, chores, goals, or history. Adults enter their profile email and password; children enter their profile PIN.
 
@@ -156,7 +156,7 @@ Both client and server implement the idle boundary:
 - Every authenticated request conditionally verifies that the session is unrevoked, active, and strictly unexpired before renewing it.
 - The browser keeps household data only in React memory and schedules a lock from the server expiry.
 - `pointerdown`, `touchstart`, `keydown`, and `input` are meaningful activity. Touch calls are coalesced to at most one every 200 ms.
-- No later than ten seconds after the last meaningful activity, memory is cleared and the browser returns to the selector.
+- No later than 60 seconds after the last meaningful activity, memory is cleared and the browser returns to the selector.
 - When a hidden tab becomes visible, it rechecks the server before displaying private state.
 - A stale cookie, refresh, direct child/parent URL, throttled timer, or failed client callback cannot bypass the D1 expiry check.
 
@@ -164,7 +164,7 @@ Five failed bootstrap, adult-password, or child-PIN attempts for the same target
 
 ## Chores, recurrence, and history
 
-Parents create `ASSIGNED` chores for one or more children, or `GENERAL` chores for the Chore Board. Each selected child receives an independent instance, so one child completing a shared household chore never completes another child's copy. A chore is only added to the reusable template library when its creator selects **Save to template library**; this keeps the library intentional rather than duplicating every scheduled chore.
+Parents create chores in two steps: choose a fresh task or a saved template, then review and complete its details. Assigning one or more children creates independent `ASSIGNED` instances, so one child completing a shared household chore never completes another child's copy. Leaving everyone unassigned creates a claimable `GENERAL` chore on the Chore Board; parents can optionally limit which children can claim it. A chore is only added to the reusable template library when its creator selects **Save to template library**.
 
 Schedules support one time, every N local calendar days, and selected weekdays every N local weeks. Rules are interpreted in the household IANA time zone; materialized timestamps are UTC. Only today and the following 14 local calendar days are materialized. `(template_id, occurrence_key, assigned_child_id)` uniqueness and `INSERT OR IGNORE` make repeated cron runs idempotent. The parent chore list stacks equivalent recurring copies, while preserving independent actions for every child and occurrence.
 
@@ -172,7 +172,7 @@ The hourly job advances scheduled availability, expires unfinished instances, re
 
 General claims use one conditional D1 update, so only one child can win. Parent approval and auto-approval use the instance's title/value/currency/approval snapshots and a unique chore-ledger relation. Retries cannot credit twice. Return-to-child preserves the claimant and displays the parent's explanation to that child; Return to board is a separate parent action that clears a general claimant exactly once.
 
-Parents can filter instance history by child, status, and local date, and can edit any open chore from its card. Saving an edit cancels and replaces open scheduled copies with the revised schedule; completed, reviewed, expired, and cancelled history remains immutable. A template with no instances may be deleted; after any instance exists it can only be archived. Instance, ledger, and audit deletion is blocked by schema triggers.
+Parents can search instance history and filter it by child, status, and local date with server-side pagination. Reviews are handled on the parent dashboard; chores can be edited from their cards. Saving an edit cancels and replaces open scheduled copies with the revised schedule; completed, reviewed, expired, and cancelled history remains immutable. A template with no instances may be deleted; after any instance exists it can only be archived. Instance, ledger, and audit deletion is blocked by schema triggers.
 
 ## Ledger and goals
 
@@ -278,7 +278,7 @@ An authenticated `OWNER` can also call the idempotent manual-maintenance API. Th
 
 ## Remote deployment benchmark
 
-This is a mandatory post-deployment gate because Worker CPU characteristics—not a laptop—determine whether the 600,000-iteration parent and child verifier is appropriate on the existing Workers Paid plan. The script does not bootstrap or seed the target. It finds configured profiles by selector name, performs multiple correct sign-ins without logging credentials, invokes the real maintenance service, waits 10.1 seconds, and verifies that D1 rejects the stale child session.
+This is a mandatory post-deployment gate because Worker CPU characteristics—not a laptop—determine whether the 600,000-iteration parent and child verifier is appropriate on the existing Workers Paid plan. The script does not bootstrap or seed the target. It finds configured profiles by selector name, performs multiple correct sign-ins without logging credentials, invokes the real maintenance service, waits 60.1 seconds, and verifies that D1 rejects the stale child session.
 
 Set credentials only as environment variables in a trusted shell/session:
 

@@ -50,6 +50,7 @@ export const children = sqliteTable(
     displayName: text('display_name').notNull(),
     avatarKey: text('avatar_key').notNull(),
     accentKey: text('accent_key').notNull(),
+    shapeKey: text('shape_key').$type<'circle' | 'star' | 'square' | 'heart' | 'diamond' | 'triangle' | 'hexagon'>().notNull().default('circle'),
     pinHash: text('pin_hash').notNull(),
     active: integer('active', { mode: 'boolean' }).notNull(),
     createdAt: text('created_at').notNull(),

@@ -35,4 +35,24 @@ test('phone and tablet selector flows are keyboard-usable, low-motion, and free 
   if (testInfo.project.name === 'phone') await page.screenshot({ path: testInfo.outputPath('dashboard.png') });
   await page.getByRole('button', { name: 'Lock and switch user' }).click();
   await expect(page.getByRole('heading', { name: 'Who’s using the app?' })).toBeVisible();
+  await page.getByRole('button', { name: 'E2E Child Child' }).click();
+  const keypad = page.getByRole('dialog', { name: 'Hi, E2E Child!' });
+  await expect(keypad).toBeVisible();
+  await expect(keypad.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Who’s using the app?' })).toHaveCount(0);
+  await keypad.getByRole('button', { name: 'PIN digit 2' }).click();
+  await keypad.getByRole('button', { name: 'PIN digit 4' }).click();
+  await keypad.getByRole('button', { name: 'Delete last PIN digit' }).click();
+  await expect(keypad.getByRole('status')).toHaveAttribute('aria-label', '1 of 6 PIN digits entered');
+  await keypad.getByRole('button', { name: 'Clear' }).click();
+  await expect(keypad.getByRole('status')).toHaveAttribute('aria-label', '0 of 6 PIN digits entered');
+  await expect(keypad.getByRole('button', { name: 'Continue' })).toBeDisabled();
+  const keypadMetrics = await keypad.evaluate((element) => ({
+    coversViewport: element.getBoundingClientRect().width >= window.innerWidth && element.getBoundingClientRect().height >= window.innerHeight,
+    noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1,
+    touchTargets: [...element.querySelectorAll<HTMLButtonElement>('.child-pin-key')].every((button) => button.getBoundingClientRect().height >= 44),
+  }));
+  expect(keypadMetrics).toEqual({ coversViewport: true, noHorizontalOverflow: true, touchTargets: true });
+  await keypad.getByRole('button', { name: 'Back to profiles' }).click();
+  await expect(page.getByRole('heading', { name: 'Who’s using the app?' })).toBeVisible();
 });

@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import { Archive, Copy, Edit3, KeyRound, Plus, UserRoundPlus, Users } from 'lucide-react';
-import { Avatar, avatarOptions, ColourPicker } from '@/components/avatar';
+import { Avatar, avatarOptions, ChildShapePicker, ColourPicker } from '@/components/avatar';
 import { Button, EmptyState, Field, InlineNotice, LoadingBlock, Modal, Select, TextInput } from '@/components/ui';
 import { useSession } from '@/features/auth/session';
 import { useApiResource } from '@/hooks/use-api-resource';
 import { postJson } from '@/lib/api-client';
+import type { ChildShapeKey } from '@/lib/theme';
 
 interface ParentPerson { id: string; displayName: string; email: string; role: 'OWNER' | 'PARENT'; avatarKey: string; accentKey: string; active: boolean }
-interface ChildPerson { id: string; displayName: string; avatarKey: string; accentKey: string; active: boolean }
+interface ChildPerson { id: string; displayName: string; avatarKey: string; accentKey: string; shapeKey: ChildShapeKey; active: boolean }
 interface Invitation { id: string; email: string; expiresAt: string; acceptedAt: string | null }
 interface PeopleData { parents: ParentPerson[]; children: ChildPerson[]; invitations: Invitation[] }
 
@@ -15,6 +16,7 @@ function ChildEditor({ child, onClose, onSaved }: { child?: ChildPerson | null; 
   const [displayName, setDisplayName] = useState(child?.displayName ?? '');
   const [avatarKey, setAvatarKey] = useState(child?.avatarKey ?? 'child-1');
   const [accentKey, setAccentKey] = useState(child?.accentKey ?? 'teal');
+  const [shapeKey, setShapeKey] = useState<ChildShapeKey>(child?.shapeKey ?? 'circle');
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -23,14 +25,14 @@ function ChildEditor({ child, onClose, onSaved }: { child?: ChildPerson | null; 
     if ((!child || pin) && !/^\d{4,6}$/.test(pin)) { setError('PIN must contain 4–6 numbers.'); return; }
     setBusy(true); setError(null);
     try {
-      const value = { displayName, avatarKey, accentKey, ...(pin ? { pin } : {}) };
+      const value = { displayName, avatarKey, accentKey, shapeKey, ...(pin ? { pin } : {}) };
       if (child) await postJson(`/parent/children/${child.id}`, value, 'PATCH');
       else await postJson('/parent/children', { ...value, pin });
       await onSaved();
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'The child profile could not be saved.'); }
     finally { setBusy(false); }
   };
-  return <form className="form-stack" data-theme={accentKey} onSubmit={save}><div className="avatar-preview"><Avatar avatarKey={avatarKey} accentKey={accentKey} size="lg" /></div><Field label="Display name"><TextInput value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={50} required autoFocus /></Field><div className="form-grid"><Field label="Avatar"><Select value={avatarKey} onChange={(event) => setAvatarKey(event.target.value)}>{avatarOptions.filter((option) => option.key.startsWith('child')).map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</Select></Field><ColourPicker value={accentKey} onChange={setAccentKey} label="Colour theme" /></div><Field label={child ? 'New PIN (optional)' : 'PIN'} hint={child ? 'Leave empty to keep the current PIN. Changing it locks active child sessions.' : 'Use 4–6 numbers.'}><TextInput type="password" inputMode="numeric" pattern="[0-9]{4,6}" value={pin} onChange={(event) => setPin(event.target.value)} required={!child} /></Field>{error ? <InlineNotice tone="error">{error}</InlineNotice> : null}<div className="modal-actions"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? 'Saving…' : child ? 'Save profile' : 'Add child'}</Button></div></form>;
+  return <form className="form-stack" data-theme={accentKey} onSubmit={save}><div className="avatar-preview"><Avatar avatarKey={avatarKey} accentKey={accentKey} size="lg" /></div><Field label="Display name"><TextInput value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={50} required autoFocus /></Field><div className="form-grid"><Field label="Avatar"><Select value={avatarKey} onChange={(event) => setAvatarKey(event.target.value)}>{avatarOptions.filter((option) => option.key.startsWith('child')).map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</Select></Field><ColourPicker value={accentKey} onChange={setAccentKey} label="Colour theme" /></div><ChildShapePicker value={shapeKey} onChange={setShapeKey} /><Field label={child ? 'New PIN (optional)' : 'PIN'} hint={child ? 'Leave empty to keep the current PIN. Changing it locks active child sessions.' : 'Use 4–6 numbers.'}><TextInput type="password" inputMode="numeric" pattern="[0-9]{4,6}" value={pin} onChange={(event) => setPin(event.target.value)} required={!child} /></Field>{error ? <InlineNotice tone="error">{error}</InlineNotice> : null}<div className="modal-actions"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? 'Saving…' : child ? 'Save profile' : 'Add child'}</Button></div></form>;
 }
 
 export default function PeoplePage() {

@@ -13,15 +13,16 @@ interface SessionContextValue {
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
+const SessionExpiryContext = createContext(0);
 const MEANINGFUL_EVENTS: Array<keyof WindowEventMap> = ['pointerdown', 'touchstart', 'keydown', 'input'];
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [idleExpiresAt, setIdleExpiresAt] = useState(0);
   const [checking, setChecking] = useState(true);
   const [deeperPalette, setDeeperPalette] = useState(() => localStorage.getItem('nestwork:palette-depth') === 'deep');
   const lockTimer = useRef<number | null>(null);
   const touchTimer = useRef<number | null>(null);
-  const expiryRef = useRef<number>(0);
 
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = normalizeAccentKey(session?.actor.accentKey);
@@ -37,7 +38,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const finishLock = useCallback(() => {
     clearTimers();
-    expiryRef.current = 0;
+    setIdleExpiresAt(0);
     setSession(null);
     if (window.location.pathname !== '/') window.location.replace('/');
   }, [clearTimers]);
@@ -45,7 +46,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const scheduleLock = useCallback(
     (expiresAt: string | number) => {
       const expiry = typeof expiresAt === 'number' ? expiresAt : new Date(expiresAt).getTime();
-      expiryRef.current = expiry;
+      setIdleExpiresAt(expiry);
       if (lockTimer.current !== null) window.clearTimeout(lockTimer.current);
       lockTimer.current = window.setTimeout(finishLock, Math.max(0, expiry - Date.now()));
     },
@@ -88,7 +89,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (!session) return;
     const meaningfulActivity = () => {
       // Start the usability boundary at the actual event, not after the request.
-      scheduleLock(Date.now() + 30_000);
+      scheduleLock(Date.now() + 60_000);
       if (touchTimer.current !== null) return;
       touchTimer.current = window.setTimeout(() => {
         touchTimer.current = null;
@@ -133,11 +134,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => document.documentElement.classList.remove('palette-transitioning'), 1_050);
   }, []);
   const value = useMemo(() => ({ session, checking, authenticate, lock, deeperPalette, togglePaletteDepth }), [session, checking, authenticate, lock, deeperPalette, togglePaletteDepth]);
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return <SessionContext.Provider value={value}><SessionExpiryContext.Provider value={idleExpiresAt}>{children}</SessionExpiryContext.Provider></SessionContext.Provider>;
 }
 
 export function useSession() {
   const context = useContext(SessionContext);
   if (!context) throw new Error('useSession must be used inside SessionProvider.');
   return context;
+}
+
+export function useSessionExpiry() {
+  return useContext(SessionExpiryContext);
 }

@@ -6,7 +6,7 @@ export function cx(...classes: Array<string | false | null | undefined>) {
 }
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary' | 'danger' | 'quiet';
+  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'quiet';
   size?: 'sm' | 'md' | 'lg';
 };
 

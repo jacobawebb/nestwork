@@ -1,5 +1,6 @@
+import { Circle, Diamond, Heart, Hexagon, Square, Star, Triangle } from 'lucide-react';
 import { cx } from './ui';
-import { accentKeys, avatarColor, normalizeAccentKey, themeOptions } from '@/lib/theme';
+import { accentKeys, avatarColor, childShapeOptions, normalizeAccentKey, themeOptions, type ChildShapeKey } from '@/lib/theme';
 
 export function Avatar({ avatarKey, accentKey, size = 'md', label }: { avatarKey: string; accentKey: string; size?: 'sm' | 'md' | 'lg'; label?: string }) {
   const accent = avatarColor(accentKey);
@@ -57,6 +58,24 @@ export function ColourPicker({
       </div>
     </fieldset>
   );
+}
+
+const shapeIcons = { circle: Circle, star: Star, square: Square, heart: Heart, diamond: Diamond, triangle: Triangle, hexagon: Hexagon };
+
+export function ChildShapePicker({ value, onChange, label = 'Background shape', className }: { value: ChildShapeKey; onChange: (shapeKey: ChildShapeKey) => void; label?: string; className?: string }) {
+  return <fieldset className={cx('child-shape-picker', className)}>
+    <legend>{label}</legend>
+    <div className="child-shape-options">
+      {childShapeOptions.map((option) => {
+        const Icon = shapeIcons[option.key];
+        return <label className={`child-shape-option${value === option.key ? ' child-shape-option-selected' : ''}`} key={option.key}>
+          <input type="radio" name={label} value={option.key} checked={value === option.key} onChange={() => onChange(option.key)} />
+          <span className="child-shape-icon" aria-hidden="true"><Icon size={20} fill={option.key === 'circle' ? 'currentColor' : 'none'} /></span>
+          <span>{option.label}</span>
+        </label>;
+      })}
+    </div>
+  </fieldset>;
 }
 
 export const avatarOptions = [

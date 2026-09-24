@@ -91,7 +91,7 @@ for (let sample = 0; sample < samples; sample += 1) {
   if (sample < samples - 1) await request('/session/logout', { method: 'POST', body: {}, cookie: childCookie });
 }
 
-await delay(10_100);
+await delay(60_100);
 const stale = await request('/session', { cookie: childCookie });
 await expectStatus(stale, 401, 'Stale session check');
 if (stale.payload?.error?.code !== 'SESSION_LOCKED') throw new Error('The stale session did not fail with SESSION_LOCKED.');

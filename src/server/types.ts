@@ -1,3 +1,5 @@
+import type { ChildShapeKey } from '@/lib/theme';
+
 export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
@@ -28,6 +30,7 @@ export type Actor =
       displayName: string;
       avatarKey: string;
       accentKey: string;
+      shapeKey: ChildShapeKey;
       sessionHash: string;
       idleExpiresAt: string;
     };

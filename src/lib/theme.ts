@@ -2,6 +2,19 @@ export const accentKeys = ['teal', 'blue', 'coral', 'ochre', 'green', 'violet', 
 
 export type AccentKey = (typeof accentKeys)[number];
 
+export const childShapeKeys = ['circle', 'star', 'square', 'heart', 'diamond', 'triangle', 'hexagon'] as const;
+export type ChildShapeKey = (typeof childShapeKeys)[number];
+
+export const childShapeOptions: ReadonlyArray<{ key: ChildShapeKey; label: string }> = [
+  { key: 'circle', label: 'Circle' },
+  { key: 'star', label: 'Star' },
+  { key: 'square', label: 'Square' },
+  { key: 'heart', label: 'Heart' },
+  { key: 'diamond', label: 'Diamond' },
+  { key: 'triangle', label: 'Triangle' },
+  { key: 'hexagon', label: 'Hexagon' },
+];
+
 export const themeOptions: ReadonlyArray<{ key: AccentKey; label: string; avatarColor: string }> = [
   { key: 'teal', label: 'Teal', avatarColor: '#20a5a3' },
   { key: 'blue', label: 'Blue', avatarColor: '#5b8def' },
